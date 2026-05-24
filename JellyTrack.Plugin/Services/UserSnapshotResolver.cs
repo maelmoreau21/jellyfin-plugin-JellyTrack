@@ -22,7 +22,7 @@ internal static class UserSnapshotResolver
                 continue;
             }
 
-            var username = user.Name ?? "Unknown";
+            var username = user.Username ?? "Unknown";
 
             users.Add(new HeartbeatUser
             {
