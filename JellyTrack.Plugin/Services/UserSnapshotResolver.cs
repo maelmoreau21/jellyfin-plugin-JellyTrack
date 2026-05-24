@@ -13,7 +13,7 @@ internal static class UserSnapshotResolver
     {
         var users = new List<HeartbeatUser>();
 
-        foreach (var user in userManager.Users)
+        foreach (var user in userManager.GetUsers())
         {
             var userId = user.Id.ToString("D");
             if (string.IsNullOrWhiteSpace(userId))
