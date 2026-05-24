@@ -1,7 +1,7 @@
 name: "JellyTrack"
 guid: "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d"
-version: "1.1.0.0"
-targetAbi: "10.11.8.0"
+version: "1.2.0.0"
+targetAbi: "10.12.0.0"
 framework: "net9.0"
 owner: "JellyTrack"
 overview: "Plugin Jellyfin pour pousser les événements de lecture vers JellyTrack"
@@ -14,6 +14,11 @@ category: "General"
 artifacts:
   - "JellyTrack.Plugin.dll"
 changelog: |
+  ## v1.2.0
+  - Compatible with Jellyfin 12.0 / 10.12
+  - Replace reflection-based user resolution with direct IUserManager API
+  - Use [Authorize] attributes for admin endpoint protection
+
   ## v1.1.0
   - Compatible with Jellyfin 10.11.8
 

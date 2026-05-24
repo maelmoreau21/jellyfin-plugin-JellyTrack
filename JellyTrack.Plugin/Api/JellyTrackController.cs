@@ -3,10 +3,9 @@ using JellyTrack.Plugin.Models;
 using JellyTrack.Plugin.Services;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.Reflection;
 using System.IO;
 using System.Linq;
 
@@ -14,212 +13,27 @@ namespace JellyTrack.Plugin.Api;
 
 [ApiController]
 [Route("JellyTrack")]
+[Authorize]
 public class JellyTrackController : ControllerBase
 {
     private readonly JellyTrackApiClient _apiClient;
     private readonly IServerApplicationHost _applicationHost;
     private readonly IUserManager _userManager;
-    private readonly IAuthorizationContext _authorizationContext;
     private readonly ILogger<JellyTrackController> _logger;
 
     public JellyTrackController(
         JellyTrackApiClient apiClient,
         IServerApplicationHost applicationHost,
         IUserManager userManager,
-        IAuthorizationContext authorizationContext,
         ILogger<JellyTrackController> logger)
     {
         _apiClient = apiClient;
         _applicationHost = applicationHost;
         _userManager = userManager;
-        _authorizationContext = authorizationContext;
         _logger = logger;
     }
 
-    private static bool IsAdminUserObject(object? user)
-    {
-        if (user is null)
-        {
-            return false;
-        }
 
-        var userType = user.GetType();
-        var directAdminProp = userType.GetProperty("IsAdministrator");
-        if (directAdminProp?.GetValue(user) is bool isAdminDirect)
-        {
-            return isAdminDirect;
-        }
-
-        var policyProp = userType.GetProperty("Policy");
-        var policyObj = policyProp?.GetValue(user);
-        var policyAdminProp = policyObj?.GetType().GetProperty("IsAdministrator");
-        if (policyAdminProp?.GetValue(policyObj) is bool isAdminFromPolicy)
-        {
-            return isAdminFromPolicy;
-        }
-
-        return false;
-    }
-
-    private static bool TryGetBooleanProperty(object? source, string propertyName, out bool value)
-    {
-        value = false;
-        if (source is null)
-        {
-            return false;
-        }
-
-        var prop = source.GetType().GetProperty(propertyName);
-        if (prop?.GetValue(source) is bool boolValue)
-        {
-            value = boolValue;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static bool HasAdminSignal(object? source)
-    {
-        if (source is null)
-        {
-            return false;
-        }
-
-        var sourceType = source.GetType();
-        if (sourceType.GetProperty("IsAdministrator") is not null)
-        {
-            return true;
-        }
-
-        var policy = sourceType.GetProperty("Policy")?.GetValue(source);
-        return policy?.GetType().GetProperty("IsAdministrator") is not null;
-    }
-
-    private static string? TryGetStringProperty(object? source, string propertyName)
-    {
-        if (source is null)
-        {
-            return null;
-        }
-
-        var prop = source.GetType().GetProperty(propertyName);
-        var value = prop?.GetValue(source);
-        if (value is null)
-        {
-            return null;
-        }
-
-        return value.ToString();
-    }
-
-    private object? ResolveUserByIdFromAuthorization(object authInfo)
-    {
-        var userIdRaw = TryGetStringProperty(authInfo, "UserId");
-        if (string.IsNullOrWhiteSpace(userIdRaw))
-        {
-            return null;
-        }
-
-        var getUserByIdMethods = _userManager
-            .GetType()
-            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
-            .Where(m => string.Equals(m.Name, "GetUserById", StringComparison.Ordinal) && m.GetParameters().Length == 1)
-            .ToArray();
-
-        foreach (var method in getUserByIdMethods)
-        {
-            var parameterType = method.GetParameters()[0].ParameterType;
-            object? argument = null;
-
-            if (parameterType == typeof(Guid))
-            {
-                if (!Guid.TryParse(userIdRaw, out var userGuid))
-                {
-                    continue;
-                }
-                argument = userGuid;
-            }
-            else if (parameterType == typeof(string))
-            {
-                argument = userIdRaw;
-            }
-            else
-            {
-                continue;
-            }
-
-            try
-            {
-                return method.Invoke(_userManager, new[] { argument });
-            }
-            catch
-            {
-                // Try next overload when available.
-            }
-        }
-
-        return null;
-    }
-
-    private async Task<bool> IsAuthorizedAdminRequestAsync(CancellationToken cancellationToken)
-    {
-        var auth = await _authorizationContext.GetAuthorizationInfo(Request).ConfigureAwait(false);
-        if (auth is null || !auth.IsAuthenticated)
-        {
-            return false;
-        }
-
-        if (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-
-        var adminSignalFound = false;
-
-        if (auth.User is not null)
-        {
-            adminSignalFound |= HasAdminSignal(auth.User);
-
-            if (IsAdminUserObject(auth.User))
-            {
-                return true;
-            }
-        }
-
-        if (TryGetBooleanProperty(auth, "IsAdministrator", out var isAdmin) && isAdmin)
-        {
-            return true;
-        }
-        adminSignalFound |= TryGetBooleanProperty(auth, "IsAdministrator", out _);
-
-        var userPolicy = auth.GetType().GetProperty("UserPolicy")?.GetValue(auth);
-        if (TryGetBooleanProperty(userPolicy, "IsAdministrator", out isAdmin) && isAdmin)
-        {
-            return true;
-        }
-        adminSignalFound |= TryGetBooleanProperty(userPolicy, "IsAdministrator", out _);
-
-        var resolvedUser = ResolveUserByIdFromAuthorization(auth);
-        if (resolvedUser is not null)
-        {
-            adminSignalFound |= HasAdminSignal(resolvedUser);
-
-            if (IsAdminUserObject(resolvedUser))
-            {
-                return true;
-            }
-        }
-
-        if (adminSignalFound)
-        {
-            _logger.LogWarning("Authenticated non-admin request rejected on JellyTrack admin endpoint.");
-            return false;
-        }
-
-        _logger.LogInformation("Authenticated request accepted on JellyTrack admin endpoint because admin metadata is unavailable in this Jellyfin runtime.");
-        return true;
-    }
 
     [HttpGet("Localization/{lang}")]
     [ProducesResponseType((int)HttpStatusCode.OK)]
@@ -249,21 +63,13 @@ public class JellyTrackController : ControllerBase
     }
 
     [HttpPost("Test")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType((int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.ServiceUnavailable)]
     [ProducesResponseType((int)HttpStatusCode.InternalServerError)]
     public async Task<ActionResult> TestConnection([FromBody] TestRequest request, CancellationToken cancellationToken)
     {
-        if (!await IsAuthorizedAdminRequestAsync(cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("Unauthorized access attempt on JellyTrack/Test endpoint.");
-            return Unauthorized(new TestConnectionResponse
-            {
-                Success = false,
-                Message = "Administrator authentication required."
-            });
-        }
 
         if (string.IsNullOrWhiteSpace(request.Url) || string.IsNullOrWhiteSpace(request.ApiKey))
         {
@@ -313,20 +119,12 @@ public class JellyTrackController : ControllerBase
     }
 
     [HttpPost("HeartbeatNow")]
+    [Authorize(Policy = "RequiresElevation")]
     [ProducesResponseType((int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.ServiceUnavailable)]
     public async Task<ActionResult> SendHeartbeatNow(CancellationToken cancellationToken)
     {
-        if (!await IsAuthorizedAdminRequestAsync(cancellationToken).ConfigureAwait(false))
-        {
-            _logger.LogWarning("Unauthorized access attempt on JellyTrack/HeartbeatNow endpoint.");
-            return Unauthorized(new TestConnectionResponse
-            {
-                Success = false,
-                Message = "Administrator authentication required."
-            });
-        }
 
         var config = Plugin.Instance?.Configuration;
         if (config is null || !config.Enabled)
