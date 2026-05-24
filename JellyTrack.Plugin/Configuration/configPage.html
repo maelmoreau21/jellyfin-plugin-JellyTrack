@@ -31,17 +31,15 @@
                         <div class="fieldDescription">URL cible exacte. Exemples : http://192.168.1.100:3000/api/plugin/events ou http://192.168.1.100:3000/api/webhook/jellyfin. Si vous mettez seulement l'hôte, /api/plugin/events est utilisé par défaut. Si Jellyfin tourne en Docker, n'utilisez pas localhost: utilisez l'IP hôte, host.docker.internal ou le nom de service Docker.</div>
                     </div>
 
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtApiKey">Clé API</label>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input id="txtApiKey" type="password" is="emby-input"
-                                   placeholder="jt_xxxxxxxxxxxx" style="flex: 1;" />
-                            <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit"
-                                    style="padding: 0.4em 0.8em; min-width: auto;">
-                                Afficher
-                            </button>
-                        </div>
-                        <div class="fieldDescription">La clé API générée dans les paramètres de JellyTrack (format: jt_xxxxxxxxxxxx)</div>
+                    <div class="inputContainer" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+                        <label class="inputLabel inputLabelUnfocused" for="txtApiKey" style="width: 100%;">Clé API</label>
+                        <input id="txtApiKey" type="password" is="emby-input"
+                               placeholder="jt_xxxxxxxxxxxx" style="flex: 1; width: 0 !important; min-width: 0; margin: 0;" />
+                        <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit"
+                                style="margin: 0; padding: 0.4em 0.8em; min-width: auto;">
+                            Afficher
+                        </button>
+                        <div class="fieldDescription" style="width: 100%;">La clé API générée dans les paramètres de JellyTrack (format: jt_xxxxxxxxxxxx)</div>
                     </div>
 
                     <div class="inputContainer">
@@ -499,16 +497,17 @@
                         token = ApiClient._currentUser.AccessToken;
                     }
                 }
+                var safeToken = token ? String(token).replace(/"/g, '') : '';
                 var headers = {
-                    'Content-Type': 'application/json',
-                    'X-Emby-Token': token || '',
-                    'X-MediaBrowser-Token': token || ''
+                    'Content-Type': 'application/json'
                 };
+                if (safeToken) {
+                    headers.Authorization = 'MediaBrowser Token="' + safeToken + '"';
+                    headers['X-Emby-Token'] = safeToken;
+                    headers['X-MediaBrowser-Token'] = safeToken;
+                }
                 if (window.ApiClient && typeof ApiClient.getAuthorizationHeader === 'function') {
                     headers['X-Emby-Authorization'] = ApiClient.getAuthorizationHeader();
-                }
-                if (token) {
-                    headers.Authorization = 'Bearer ' + token;
                 }
 
                 return fetch(url, {
