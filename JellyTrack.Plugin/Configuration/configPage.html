@@ -2,6 +2,30 @@
 <html lang="fr">
 <head>
     <title>JellyTrack</title>
+    <style>
+        .jellytrack-api-key-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: .5rem;
+            width: 100%;
+        }
+
+        .jellytrack-api-key-row .emby-input,
+        .jellytrack-api-key-row input[is="emby-input"] {
+            box-sizing: border-box;
+            margin: 0;
+            min-width: 0;
+            width: 100%;
+        }
+
+        .jellytrack-api-key-row .emby-button,
+        .jellytrack-api-key-row button[is="emby-button"] {
+            margin: 0;
+            min-width: 6.5em;
+            white-space: nowrap;
+        }
+    </style>
 </head>
 <body>
     <div id="jellytrackConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
@@ -33,11 +57,11 @@
 
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="txtApiKey" data-i18n="config.apiKey.label">API Key</label>
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div class="jellytrack-api-key-row">
                             <input id="txtApiKey" type="password" is="emby-input"
-                                   placeholder="jt_xxxxxxxxxxxx" style="flex: 1; min-width: 0; margin: 0;" />
+                                   placeholder="jt_xxxxxxxxxxxx" />
                             <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit"
-                                    style="margin: 0; padding: 0.4em 0.8em; min-width: auto;" data-i18n="config.show">
+                                    data-i18n="config.show">
                                 Show
                             </button>
                         </div>

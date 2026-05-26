@@ -10,6 +10,9 @@ public sealed class PlaybackStateChangedEvent : PluginEvent
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
 
+    [JsonPropertyName("observedAtUtc")]
+    public DateTime ObservedAtUtc { get; set; }
+
     [JsonPropertyName("sessionId")]
     public string SessionId { get; set; } = string.Empty;
 
@@ -39,6 +42,9 @@ public sealed class PlaybackStateChangedEvent : PluginEvent
 
     [JsonPropertyName("subtitleStreamIndex")]
     public int? SubtitleStreamIndex { get; set; }
+
+    [JsonPropertyName("playbackRate")]
+    public double? PlaybackRate { get; set; }
 
     [JsonPropertyName("metadata")]
     public Dictionary<string, object?> Metadata { get; set; } = new();

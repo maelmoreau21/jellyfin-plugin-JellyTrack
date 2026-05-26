@@ -117,4 +117,7 @@ public sealed class EventSession
 
     [JsonPropertyName("isPaused")]
     public bool? IsPaused { get; set; }
+
+    [JsonPropertyName("playbackRate")]
+    public double? PlaybackRate { get; set; }
 }

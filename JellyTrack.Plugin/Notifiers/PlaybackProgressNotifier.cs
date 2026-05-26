@@ -7,6 +7,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 
 namespace JellyTrack.Plugin.Notifiers;
 
@@ -59,6 +60,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
         var isPaused = e.Session.PlayState?.IsPaused ?? e.IsPaused;
         var audioStreamIndex = e.Session.PlayState?.AudioStreamIndex;
         var subtitleStreamIndex = e.Session.PlayState?.SubtitleStreamIndex;
+        var observedAtUtc = DateTime.UtcNow;
 
         var decision = _telemetryState.ObserveProgress(new PlaybackProgressObservation(
             SessionId: sessionId,
@@ -72,7 +74,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             TrackPauseResume: config.TrackPauseResume,
             TrackSeek: config.TrackSeek,
             TrackAudioSubtitleChanges: config.TrackAudioSubtitleChanges,
-            TimestampUtc: DateTime.UtcNow));
+            TimestampUtc: observedAtUtc));
 
         if (!decision.ShouldSendProgress && decision.StateChanges.Count == 0)
         {
@@ -86,7 +88,8 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
         {
             payload = new PlaybackProgressEvent
             {
-                Timestamp = DateTime.UtcNow,
+                Timestamp = observedAtUtc,
+                ObservedAtUtc = observedAtUtc,
                 SessionId = sessionId,
                 User = new EventUser
                 {
@@ -107,6 +110,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                 AudioStreamIndex = audioStreamIndex,
                 SubtitleStreamIndex = subtitleStreamIndex
             };
+            payload.PlaybackRate = payload.Session.PlaybackRate;
 
             if (item is Episode episode)
             {
@@ -131,7 +135,8 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             _logger.LogWarning(ex, "PlaybackProgress enrichment failed for session {SessionId}. Sending minimal payload.", sessionId);
             payload = new PlaybackProgressEvent
             {
-                Timestamp = DateTime.UtcNow,
+                Timestamp = observedAtUtc,
+                ObservedAtUtc = observedAtUtc,
                 SessionId = sessionId,
                 User = new EventUser
                 {
@@ -153,13 +158,15 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                     PlayMethod = e.Session.PlayState?.PlayMethod?.ToString(),
                     IpAddress = e.Session.RemoteEndPoint,
                     PositionTicks = e.Session.PlayState?.PositionTicks ?? 0,
-                    IsPaused = e.Session.PlayState?.IsPaused
+                    IsPaused = e.Session.PlayState?.IsPaused,
+                    PlaybackRate = TryGetPlaybackRate(e.Session),
                 },
                 PositionTicks = positionTicks,
                 IsPaused = isPaused,
                 AudioStreamIndex = audioStreamIndex,
                 SubtitleStreamIndex = subtitleStreamIndex
             };
+            payload.PlaybackRate = payload.Session.PlaybackRate;
         }
 
         await SendStateChangesAsync(payload, decision.StateChanges).ConfigureAwait(false);
@@ -181,6 +188,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             IpAddress = session.RemoteEndPoint,
             PositionTicks = session.PlayState?.PositionTicks ?? 0,
             IsPaused = session.PlayState?.IsPaused,
+            PlaybackRate = TryGetPlaybackRate(session),
         };
 
         if (session.TranscodingInfo is not null)
@@ -226,6 +234,73 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
         return sessionInfo;
     }
 
+    private static double? TryGetPlaybackRate(MediaBrowser.Controller.Session.SessionInfo session)
+    {
+        var candidates = new object?[] { session.PlayState, session };
+        var propertyNames = new[] { "PlaybackRate", "PlaybackSpeed", "PlaySpeed", "Speed", "Rate" };
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate is null)
+            {
+                continue;
+            }
+
+            var type = candidate.GetType();
+            foreach (var propertyName in propertyNames)
+            {
+                var property = type.GetProperty(propertyName);
+                if (property is null)
+                {
+                    continue;
+                }
+
+                var value = property.GetValue(candidate);
+                var parsed = ParsePlaybackRate(value);
+                if (parsed.HasValue)
+                {
+                    return parsed.Value;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static double? ParsePlaybackRate(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        double parsed;
+        if (value is string text)
+        {
+            if (!double.TryParse(text.Trim().TrimStart('x', 'X'), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
+            {
+                return null;
+            }
+        }
+        else
+        {
+            try
+            {
+                parsed = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+            }
+            catch (InvalidCastException)
+            {
+                return null;
+            }
+            catch (FormatException)
+            {
+                return null;
+            }
+        }
+
+        return parsed >= 0.25d && parsed <= 4d ? parsed : null;
+    }
+
     private static string InferCollectionType(BaseItem item)
     {
         return item switch
@@ -249,9 +324,11 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
     {
         foreach (var change in changes)
         {
+            var observedAtUtc = DateTime.UtcNow;
             var payload = new PlaybackStateChangedEvent
             {
-                Timestamp = DateTime.UtcNow,
+                Timestamp = observedAtUtc,
+                ObservedAtUtc = observedAtUtc,
                 SessionId = progressPayload.SessionId,
                 ChangeType = change.ChangeType,
                 User = progressPayload.User,
@@ -262,6 +339,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                 IsPaused = progressPayload.IsPaused,
                 AudioStreamIndex = progressPayload.AudioStreamIndex,
                 SubtitleStreamIndex = progressPayload.SubtitleStreamIndex,
+                PlaybackRate = progressPayload.PlaybackRate,
                 Metadata = change.Metadata,
             };
 
