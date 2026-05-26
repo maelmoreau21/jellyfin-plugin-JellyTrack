@@ -21,22 +21,25 @@ jobs:
         dotnet-version: 9.0.x
 
     - name: Restore dependencies
-      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj
+      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj -p:JellyfinPackageVersion=10.11.10
 
     - name: Build and Publish
-      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -o ./publish
+      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -o ./publish -p:JellyfinPackageVersion=10.11.10
 
     - name: Create Zip Archive
       run: |
+        VERSION="${GITHUB_REF_NAME#v}"
+        cp meta.json ./publish/meta.json
+        cp assets/banner.png ./publish/Jellyfin.Plugin.JellyTrack.png
         cd ./publish
-        zip -r ../JellyTrack.Plugin.zip ./*
+        zip -r ../Jellyfin.Plugin.JellyTrack-${VERSION}.zip meta.json Jellyfin.Plugin.JellyTrack.deps.json Jellyfin.Plugin.JellyTrack.dll Jellyfin.Plugin.JellyTrack.pdb Jellyfin.Plugin.JellyTrack.png
         cd ..
 
     - name: Create GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: JellyTrack.Plugin.zip
+        files: Jellyfin.Plugin.JellyTrack-*.zip
         generate_release_notes: true
 
     - name: Setup Python

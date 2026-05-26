@@ -19,7 +19,7 @@ jobs:
         dotnet-version: 9.0.x
 
     - name: Restore dependencies
-      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj
+      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj -p:JellyfinPackageVersion=10.11.10
 
     - name: Build
-      run: dotnet build JellyTrack.Plugin/JellyTrack.Plugin.csproj --no-restore --configuration Release
+      run: dotnet build JellyTrack.Plugin/JellyTrack.Plugin.csproj --no-restore --configuration Release -p:JellyfinPackageVersion=10.11.10 -warnaserror:CS0618

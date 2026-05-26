@@ -22,7 +22,8 @@ def main():
         sys.exit(1)
 
     build_yaml_path = "JellyTrack.Plugin/build.yaml"
-    zip_path = "JellyTrack.Plugin.zip"
+    zip_name = f"Jellyfin.Plugin.JellyTrack-{tag.lstrip('v')}.zip"
+    zip_path = zip_name
     
     manifest_path = "manifest.json"
 
@@ -36,7 +37,7 @@ def main():
         "version": tag.lstrip('v'),
         "changelog": build_info.get("changelog", ""),
         "targetAbi": target_abi,
-        "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/JellyTrack.Plugin.zip",
+        "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{zip_name}",
         "checksum": checksum,
         "timestamp": ""
     }
@@ -73,10 +74,12 @@ def main():
             "overview": build_info.get("overview"),
             "owner": build_info.get("owner"),
             "category": build_info.get("category"),
-            "imageUrl": "",
+            "imageUrl": f"https://raw.githubusercontent.com/{repo}/main/assets/banner.png",
             "versions": []
         }
         manifest.append(plugin_entry)
+
+    plugin_entry["imageUrl"] = f"https://raw.githubusercontent.com/{repo}/main/assets/banner.png"
 
     versions = plugin_entry.get("versions", [])
     version_exists = False

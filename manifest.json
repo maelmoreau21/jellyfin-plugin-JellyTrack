@@ -2,12 +2,20 @@
     {
         "guid": "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d",
         "name": "JellyTrack",
-        "description": "JellyTrack est un tableau de bord analytique pour Jellyfin. Ce plugin intercepte les événements de lecture (start, stop, progress), les changements de bibliothèque et envoie un heartbeat périodique vers le serveur JellyTrack.\n",
-        "overview": "Plugin Jellyfin pour pousser les événements de lecture vers JellyTrack",
+        "description": "JellyTrack est un tableau de bord analytique pour Jellyfin. Ce plugin intercepte les evenements de lecture, les changements de bibliotheque et envoie un heartbeat periodique vers le serveur JellyTrack.\n",
+        "overview": "Plugin Jellyfin pour pousser les evenements de lecture vers JellyTrack",
         "owner": "JellyTrack",
         "category": "General",
-        "imageUrl": "https://raw.githubusercontent.com/maelmoreau21/JellyTrack.Plugin/main/assets/banner.png",
+        "imageUrl": "https://raw.githubusercontent.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/main/assets/banner.png",
         "versions": [
+            {
+                "version": "1.6.0.0",
+                "changelog": "## v1.6.0\n- Target Jellyfin 10.11.x public releases\n- Add schema v3 telemetry with immediate pause/resume/seek/audio/subtitle/session-end events\n- Use very precise 5s playing progress with 30s paused progress by default\n- Coalesce queued PlaybackProgress retries per session for large-server efficiency\n- Rename the release package and assembly to Jellyfin.Plugin.JellyTrack\n",
+                "targetAbi": "10.11.0.0",
+                "sourceUrl": "https://github.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/releases/download/v1.6.0.0/Jellyfin.Plugin.JellyTrack-1.6.0.0.zip",
+                "checksum": "bc35c5ae56ea8ecc2e5398e5c036a197",
+                "timestamp": "2026-05-26T18:20:16Z"
+            },
             {
                 "version": "1.2.0.0",
                 "changelog": "## v1.2.0\n- Compatible with Jellyfin 12.0 / 10.12\n- Replace reflection-based user resolution with direct IUserManager API\n- Use [Authorize] attributes for admin endpoint protection\n\n## v1.1.0\n- Compatible with Jellyfin 10.11.8\n\n## v1.0.9\n- Disable plugin by default on fresh installs to avoid outbound calls before configuration\n- Skip heartbeat sends when URL/API key are missing or still set to placeholder values\n- Clarify that `Unauthorized` heartbeat logs indicate API key/runtime config issues, not repository installation failures\n\n## v1.0.6\n- Enrich PlaybackProgress payload with media metadata (title/type/duration)\n- Enrich PlaybackProgress payload with session metadata (IP/client/device/playmethod)\n- Improve pause state visibility and fallback behavior when PlaybackStart is missing\n\n## v1.0.5\n- Fix runtime compatibility with Jellyfin 10.11 by removing fragile direct user API calls\n- Resolve users via reflection fallback for heartbeat and playback events\n- Improve delivery diagnostics in logs for sent JellyTrack events\n\n## v1.0.3\n- Move connection test to a server-side plugin endpoint instead of browser fetch\n- Return detailed HTTP error messages during plugin connection tests\n- Send an immediate heartbeat after saving plugin configuration\n\n## v1.0.2\n- Fix UUID formatting in all events (canonical GUID format)\n- Register heartbeat task explicitly in DI\n- Improve API client endpoint normalization and send Authorization + X-Api-Key\n\n## v1.0.0\n- Initial release\n- PlaybackStart / PlaybackStop / PlaybackProgress events\n- Heartbeat with user sync\n- Library change notifications with debounce\n- Admin configuration page\n",

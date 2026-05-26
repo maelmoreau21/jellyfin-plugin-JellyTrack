@@ -1,0 +1,16 @@
+{
+  "category": "General",
+  "changelog": "Targets Jellyfin 10.11.x with plugin version 1.6.0.0. Adds schema v3 precision telemetry, immediate pause/resume/seek/audio/subtitle/session-end events, coalesced progress retries, and the renamed Jellyfin.Plugin.JellyTrack package.",
+  "description": "JellyTrack est un tableau de bord analytique pour Jellyfin. Ce plugin intercepte les evenements de lecture, les changements de bibliotheque et envoie un heartbeat periodique vers le serveur JellyTrack.",
+  "guid": "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d",
+  "name": "JellyTrack",
+  "overview": "Plugin Jellyfin pour pousser les evenements de lecture vers JellyTrack",
+  "owner": "JellyTrack",
+  "targetAbi": "10.11.0.0",
+  "timestamp": "2026-05-26T18:20:16Z",
+  "version": "1.6.0.0",
+  "imagePath": "Jellyfin.Plugin.JellyTrack.png",
+  "assemblies": [
+    "Jellyfin.Plugin.JellyTrack.dll"
+  ]
+}

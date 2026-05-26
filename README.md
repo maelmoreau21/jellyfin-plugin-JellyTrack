@@ -9,8 +9,8 @@
 <h1 align="center">JellyTrack Plugin</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/maelmoreau21/JellyTrack.Plugin" alt="GitHub Release">
-  <img src="https://img.shields.io/github/license/maelmoreau21/JellyTrack.Plugin" alt="License">
+  <img src="https://img.shields.io/github/v/release/maelmoreau21/Jellyfin.Plugin.JellyTrack" alt="GitHub Release">
+  <img src="https://img.shields.io/github/license/maelmoreau21/Jellyfin.Plugin.JellyTrack" alt="License">
 </p>
 
 <p align="center">
@@ -37,7 +37,7 @@ Privilegiez l'installation via le depot officiel pour beneficier des mises a jou
 2. Cliquez sur le bouton `+` (Ajouter).
 3. Remplissez les informations suivantes :
    - **Nom** : `JellyTrack`
-   - **URL** : `https://raw.githubusercontent.com/maelmoreau21/JellyTrack.Plugin/main/manifest.json`
+   - **URL** : `https://raw.githubusercontent.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/main/manifest.json`
 
 ### 2. Installation
 
@@ -54,32 +54,27 @@ Une fois installe, rendez-vous dans **Tableau de bord** > **Plugins** > **JellyT
 - **URL JellyTrack** : l'adresse de votre serveur, par exemple `http://192.168.1.100:3000`.
 - **Cle API** : la cle generee dans l'interface de JellyTrack, au format `jt_xxxxxxxxxxxx`.
 - **Intervalle heartbeat** : frequence de verification de sante, par defaut `600s`.
-- **Telemetrie** : le profil `Tres precis` est le defaut de la version Jellyfin 12 beta, avec progression toutes les `5s` en lecture et toutes les `30s` en pause.
+- **Telemetrie** : le profil `Tres precis` est le defaut, avec progression toutes les `5s` en lecture et toutes les `30s` en pause.
 
 > [!TIP]
 > Utilisez le bouton **Tester la connexion** pour verifier que le plugin communique correctement avec votre serveur avant d'enregistrer.
 
 ---
 
-## Build Jellyfin 12 beta
+## Build Jellyfin 10.11 public
 
-La branche courante du plugin cible Jellyfin 12 beta uniquement pour la prochaine version `1.3.0.0`.
-Les paquets beta Jellyfin sont restaures depuis GitHub Packages, en plus de NuGet.org.
+La version `1.6.0.0` cible Jellyfin `10.11.x` public avec `JellyfinPackageVersion=10.11.10` et `targetAbi=10.11.0.0`.
 
 ```powershell
 dotnet restore .\plugin-jellytrack.sln `
-  -p:JellyfinPackageVersion=12.0.0-20260523021143 `
-  --source https://api.nuget.org/v3/index.json `
-  --source https://nuget.pkg.github.com/jellyfin/index.json
+  -p:JellyfinPackageVersion=10.11.10
 
 dotnet build .\plugin-jellytrack.sln -c Release --no-restore `
-  -p:JellyfinPackageVersion=12.0.0-20260523021143 `
+  -p:JellyfinPackageVersion=10.11.10 `
   -warnaserror:CS0618
 ```
 
-Si GitHub Packages demande une authentification, configurez une source NuGet `jellyfin` avec un token GitHub autorise a lire les packages, puis relancez les memes commandes.
-
-Pour publier la version `1.3.0.0`, creez `JellyTrack.Plugin.zip` depuis le build Jellyfin 12 beta, puis lancez `scripts/update_manifest.py` avec `REPO=maelmoreau21/JellyTrack.Plugin` et `RELEASE_TAG=v1.3.0.0` afin de calculer le checksum du vrai zip.
+Pour publier la version `1.6.0.0`, creez `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` depuis le build Release, puis lancez `scripts/update_manifest.py` avec `REPO=maelmoreau21/Jellyfin.Plugin.JellyTrack` et `RELEASE_TAG=v1.6.0.0` afin de calculer le checksum du vrai zip.
 
 ---
 
@@ -87,9 +82,9 @@ Pour publier la version `1.3.0.0`, creez `JellyTrack.Plugin.zip` depuis le build
 
 Si vous ne pouvez pas utiliser le depot :
 
-1. Telechargez le fichier `JellyTrack.Plugin.dll` depuis les [Releases](https://github.com/maelmoreau21/JellyTrack.Plugin/releases).
+1. Telechargez le fichier `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` depuis les [Releases](https://github.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/releases).
 2. Creez un dossier `JellyTrack` dans votre repertoire `plugins` Jellyfin.
-3. Copiez le fichier `.dll` dedans et redemarrez Jellyfin.
+3. Extrayez `meta.json`, `Jellyfin.Plugin.JellyTrack.deps.json`, `Jellyfin.Plugin.JellyTrack.dll`, `Jellyfin.Plugin.JellyTrack.pdb` et `Jellyfin.Plugin.JellyTrack.png` dedans, puis redemarrez Jellyfin.
 
 ---
 

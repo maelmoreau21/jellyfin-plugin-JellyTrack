@@ -10,112 +10,112 @@
             <div class="content-primary">
                 <form id="jellytrackConfigForm">
                     <div class="sectionTitleContainer flex align-items-center">
-                        <h2 class="sectionTitle">JellyTrack</h2>
+                        <h2 class="sectionTitle" data-i18n="plugin.title">JellyTrack</h2>
                     </div>
 
                     <div class="verticalSection">
-                        <p>Configure la connexion vers votre serveur JellyTrack.</p>
+                        <p data-i18n="plugin.description">Sends playback events and media metadata to JellyTrack for analysis.</p>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="chkEnabled" type="checkbox" is="emby-checkbox" />
-                            <span>Activer le plugin</span>
+                            <span data-i18n="config.enable">Enable plugin</span>
                         </label>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtJellyTrackUrl">URL de JellyTrack</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtJellyTrackUrl" data-i18n="config.jellytrackUrl.label">JellyTrack URL</label>
                         <input id="txtJellyTrackUrl" type="url" is="emby-input"
                                placeholder="http://192.168.1.100:3000/api/plugin/events" />
-                        <div class="fieldDescription">URL cible exacte. Exemples : http://192.168.1.100:3000/api/plugin/events ou http://192.168.1.100:3000/api/webhook/jellyfin. Si vous mettez seulement l'hôte, /api/plugin/events est utilisé par défaut. Si Jellyfin tourne en Docker, n'utilisez pas localhost: utilisez l'IP hôte, host.docker.internal ou le nom de service Docker.</div>
+                        <div class="fieldDescription" data-i18n="config.jellytrackUrl.description">Target URL. Examples: http://192.168.1.100:3000/api/plugin/events</div>
                     </div>
 
                     <div class="inputContainer" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
-                        <label class="inputLabel inputLabelUnfocused" for="txtApiKey" style="width: 100%;">Clé API</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtApiKey" style="width: 100%;" data-i18n="config.apiKey.label">API Key</label>
                         <input id="txtApiKey" type="password" is="emby-input"
                                placeholder="jt_xxxxxxxxxxxx" style="flex: 1; width: 0 !important; min-width: 0; margin: 0;" />
                         <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit"
-                                style="margin: 0; padding: 0.4em 0.8em; min-width: auto;">
-                            Afficher
+                                style="margin: 0; padding: 0.4em 0.8em; min-width: auto;" data-i18n="config.show">
+                            Show
                         </button>
-                        <div class="fieldDescription" style="width: 100%;">La clé API générée dans les paramètres de JellyTrack (format: jt_xxxxxxxxxxxx)</div>
+                        <div class="fieldDescription" style="width: 100%;" data-i18n="config.apiKey.description">The API key generated in JellyTrack settings (format: jt_xxxxxxxxxxxx)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtHeartbeatInterval">Intervalle Heartbeat (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtHeartbeatInterval" data-i18n="config.heartbeatInterval.label">Heartbeat interval (seconds)</label>
                         <input id="txtHeartbeatInterval" type="number" is="emby-input"
                                min="300" max="3600" step="1" />
-                        <div class="fieldDescription">Intervalle entre chaque heartbeat envoyé à JellyTrack (défaut: 600 secondes)</div>
+                        <div class="fieldDescription" data-i18n="config.heartbeatInterval.description">Interval between each heartbeat sent to JellyTrack (default: 600 seconds)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtProgressInterval">Intervalle PlaybackProgress (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtProgressInterval" data-i18n="config.progressInterval.label">PlaybackProgress interval (seconds)</label>
                         <input id="txtProgressInterval" type="number" is="emby-input"
                                min="1" max="300" step="1" />
-                        <div class="fieldDescription">Intervalle pendant la lecture active (defaut: 5 secondes)</div>
+                        <div class="fieldDescription" data-i18n="config.progressInterval.description">Interval while playback is active (default: 5 seconds)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtPausedProgressInterval">Intervalle pause (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtPausedProgressInterval" data-i18n="config.pausedProgressInterval.label">Paused interval (seconds)</label>
                         <input id="txtPausedProgressInterval" type="number" is="emby-input"
                                min="5" max="3600" step="1" />
-                        <div class="fieldDescription">Intervalle lorsque la lecture est en pause (defaut: 30 secondes)</div>
+                        <div class="fieldDescription" data-i18n="config.pausedProgressInterval.description">Interval while playback is paused (default: 30 seconds)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtSeekThreshold">Seuil seek (secondes)</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtSeekThreshold" data-i18n="config.seekThreshold.label">Seek threshold (seconds)</label>
                         <input id="txtSeekThreshold" type="number" is="emby-input"
                                min="5" max="300" step="1" />
-                        <div class="fieldDescription">Ecart minimum pour signaler un saut manuel (defaut: 20 secondes)</div>
+                        <div class="fieldDescription" data-i18n="config.seekThreshold.description">Minimum position jump reported as a manual seek (default: 20 seconds)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtRetryQueueSize">Taille maximale de la file retry</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtRetryQueueSize" data-i18n="config.retryQueueSize.label">Maximum retry queue size</label>
                         <input id="txtRetryQueueSize" type="number" is="emby-input"
                                min="10" max="5000" step="1" />
-                        <div class="fieldDescription">Nombre maximum d'evenements gardes localement si JellyTrack est indisponible (defaut: 500)</div>
+                        <div class="fieldDescription" data-i18n="config.retryQueueSize.description">Maximum events kept locally while JellyTrack is unavailable (default: 500)</div>
                     </div>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtRetryFlushBatchSize">Lot de renvoi retry</label>
+                        <label class="inputLabel inputLabelUnfocused" for="txtRetryFlushBatchSize" data-i18n="config.retryFlushBatchSize.label">Retry flush batch size</label>
                         <input id="txtRetryFlushBatchSize" type="number" is="emby-input"
                                min="1" max="500" step="1" />
-                        <div class="fieldDescription">Nombre maximum d'evenements renvoyes par passage lorsque JellyTrack repond a nouveau (defaut: 50)</div>
+                        <div class="fieldDescription" data-i18n="config.retryFlushBatchSize.description">Maximum events resent per flush when JellyTrack responds again (default: 50)</div>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="chkTrackPauseResume" type="checkbox" is="emby-checkbox" />
-                            <span>Capturer pause et reprise immediatement</span>
+                            <span data-i18n="config.trackPauseResume">Capture pause and resume immediately</span>
                         </label>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="chkTrackSeek" type="checkbox" is="emby-checkbox" />
-                            <span>Capturer les seek immediatement</span>
+                            <span data-i18n="config.trackSeek">Capture seek events immediately</span>
                         </label>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="chkTrackAudioSubtitleChanges" type="checkbox" is="emby-checkbox" />
-                            <span>Capturer les changements audio et sous-titres</span>
+                            <span data-i18n="config.trackAudioSubtitleChanges">Capture audio and subtitle changes</span>
                         </label>
                     </div>
 
                     <div class="checkboxContainer checkboxContainer-withDescription">
                         <label class="emby-checkbox-label">
                             <input id="chkTrackSessionEnded" type="checkbox" is="emby-checkbox" />
-                            <span>Fermer les lectures quand une session se termine</span>
+                            <span data-i18n="config.trackSessionEnded">Close playbacks when a session ends</span>
                         </label>
                     </div>
 
                     <div class="inputContainer">
-                            <label class="inputLabel inputLabelUnfocused" for="selPreferredLanguage">Langue préférée (optionnel)</label>
+                            <label class="inputLabel inputLabelUnfocused" for="selPreferredLanguage" data-i18n="config.preferredLanguage.label">Preferred language (optional)</label>
                             <select id="selPreferredLanguage" is="emby-select">
-                                <option value="">Auto — Utiliser la langue du serveur Jellyfin</option>
+                                <option value="" data-i18n="config.preferredLanguage.auto">Auto - use Jellyfin server language</option>
                                 <option value="en">English (en)</option>
                                 <option value="fr">Français (fr)</option>
                                 <option value="de">Deutsch (de)</option>
@@ -127,19 +127,19 @@
                                 <option value="ru">Русский (ru)</option>
                                 <option value="zh">中文 (zh)</option>
                             </select>
-                            <div class="fieldDescription">Sélectionnez la langue de l'interface utilisée par JellyTrack. Laisser sur «Auto» pour appliquer automatiquement la langue du serveur Jellyfin.</div>
+                            <div class="fieldDescription" data-i18n="config.preferredLanguage.description">Select the UI language used by JellyTrack. Leave on 'Auto' to use Jellyfin's server language.</div>
                     </div>
 
                     <div style="margin-top: 1em;">
                         <button id="btnTestConnection" type="button" is="emby-button" class="raised button-submit">
-                            <span>Tester la connexion</span>
+                            <span data-i18n="config.testConnection">Test connection</span>
                         </button>
                         <span id="testResult" style="margin-left: 1em; font-weight: bold;"></span>
                     </div>
 
                     <div style="margin-top: 2em;">
                         <button is="emby-button" type="submit" class="raised button-submit block">
-                            <span>Enregistrer</span>
+                            <span data-i18n="config.save">Save</span>
                         </button>
                     </div>
                 </form>
@@ -161,9 +161,22 @@
                     "config.heartbeatInterval.label": "Heartbeat interval (seconds)",
                     "config.heartbeatInterval.description": "Interval between each heartbeat sent to JellyTrack (default: 600 seconds)",
                     "config.progressInterval.label": "PlaybackProgress interval (seconds)",
-                    "config.progressInterval.description": "Interval for playback progress updates (default: 15 seconds)",
+                    "config.progressInterval.description": "Interval while playback is active (default: 5 seconds)",
+                    "config.pausedProgressInterval.label": "Paused interval (seconds)",
+                    "config.pausedProgressInterval.description": "Interval while playback is paused (default: 30 seconds)",
+                    "config.seekThreshold.label": "Seek threshold (seconds)",
+                    "config.seekThreshold.description": "Minimum position jump reported as a manual seek (default: 20 seconds)",
+                    "config.retryQueueSize.label": "Maximum retry queue size",
+                    "config.retryQueueSize.description": "Maximum events kept locally while JellyTrack is unavailable (default: 500)",
+                    "config.retryFlushBatchSize.label": "Retry flush batch size",
+                    "config.retryFlushBatchSize.description": "Maximum events resent per flush when JellyTrack responds again (default: 50)",
+                    "config.trackPauseResume": "Capture pause and resume immediately",
+                    "config.trackSeek": "Capture seek events immediately",
+                    "config.trackAudioSubtitleChanges": "Capture audio and subtitle changes",
+                    "config.trackSessionEnded": "Close playbacks when a session ends",
                     "config.preferredLanguage.label": "Preferred language (optional)",
                     "config.preferredLanguage.description": "Select the UI language used by JellyTrack. Leave on 'Auto' to use Jellyfin's server language.",
+                    "config.preferredLanguage.auto": "Auto - use Jellyfin server language",
                     "config.testConnection": "Test connection",
                     "config.test.inProgress": "Testing...",
                     "config.test.connection.success": "Connection successful to {endpoint}",
@@ -437,32 +450,25 @@
 
             function applyTranslations() {
                 var lang = pickLocale(currentLang || (navigator.language || navigator.userLanguage || 'en'));
-                document.querySelector('.sectionTitle').textContent = translate('plugin.title', null, lang);
-                var p = document.querySelector('.verticalSection p'); if (p) p.textContent = translate('plugin.description', null, lang);
-                var chkSpan = document.querySelector('label.emby-checkbox-label span'); if (chkSpan) chkSpan.textContent = translate('config.enable', null, lang);
+                document.querySelectorAll('[data-i18n]').forEach(function (el) {
+                    var key = el.getAttribute('data-i18n');
+                    if (key) {
+                        el.textContent = translate(key, null, lang);
+                    }
+                });
 
-                var lbl = document.querySelector('label[for="txtJellyTrackUrl"]'); if (lbl) lbl.textContent = translate('config.jellytrackUrl.label', null, lang);
-                var urlDesc = lbl && lbl.parentElement.querySelector('.fieldDescription'); if (urlDesc) urlDesc.textContent = translate('config.jellytrackUrl.description', null, lang);
+                document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+                    var key = el.getAttribute('data-i18n-placeholder');
+                    if (key) {
+                        el.setAttribute('placeholder', translate(key, null, lang));
+                    }
+                });
 
-                var apiLabel = document.querySelector('label[for="txtApiKey"]'); if (apiLabel) apiLabel.textContent = translate('config.apiKey.label', null, lang);
-                var apiInput = document.querySelector('#txtApiKey'); if (apiInput) apiInput.placeholder = translate('config.apiKey.placeholder', null, lang);
-                var apiDesc = apiLabel && apiLabel.parentElement.querySelector('.fieldDescription'); if (apiDesc) apiDesc.textContent = translate('config.apiKey.description', null, lang);
-
-                var hbLabel = document.querySelector('label[for="txtHeartbeatInterval"]'); if (hbLabel) hbLabel.textContent = translate('config.heartbeatInterval.label', null, lang);
-                var hbDesc = hbLabel && hbLabel.parentElement.querySelector('.fieldDescription'); if (hbDesc) hbDesc.textContent = translate('config.heartbeatInterval.description', null, lang);
-
-                var prLabel = document.querySelector('label[for="txtProgressInterval"]'); if (prLabel) prLabel.textContent = translate('config.progressInterval.label', null, lang);
-                var prDesc = prLabel && prLabel.parentElement.querySelector('.fieldDescription'); if (prDesc) prDesc.textContent = translate('config.progressInterval.description', null, lang);
-
-                var prefLabel = document.querySelector('label[for="selPreferredLanguage"]'); if (prefLabel) prefLabel.textContent = translate('config.preferredLanguage.label', null, lang);
-                var prefDesc = prefLabel && prefLabel.parentElement.querySelector('.fieldDescription'); if (prefDesc) prefDesc.textContent = translate('config.preferredLanguage.description', null, lang);
-
-                var btnTest = document.querySelector('#btnTestConnection'); if (btnTest) {
-                    var s = btnTest.querySelector('span'); if (s) s.textContent = translate('config.testConnection', null, lang); else btnTest.textContent = translate('config.testConnection', null, lang);
+                var toggleBtn = document.querySelector('#btnToggleApiKey');
+                var apiInput = document.querySelector('#txtApiKey');
+                if (toggleBtn && apiInput) {
+                    toggleBtn.textContent = translate(apiInput.type === 'password' ? 'config.show' : 'config.hide', null, lang);
                 }
-                var saveBtn = document.querySelector('button[type="submit"]'); if (saveBtn) { var s2 = saveBtn.querySelector('span'); if (s2) s2.textContent = translate('config.save', null, lang); else saveBtn.textContent = translate('config.save', null, lang); }
-
-                var toggleBtn = document.querySelector('#btnToggleApiKey'); if (toggleBtn) toggleBtn.textContent = translate('config.show', null, lang);
             }
 
             function getLocalizationBaseUrl() {
