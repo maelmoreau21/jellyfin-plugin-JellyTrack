@@ -15,17 +15,20 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
     private readonly JellyTrackApiClient _apiClient;
     private readonly ILibraryManager _libraryManager;
     private readonly IMediaSourceManager _mediaSourceManager;
+    private readonly PlaybackMediaStreamCache _streamCache;
     private readonly ILogger<PlaybackStartNotifier> _logger;
 
     public PlaybackStartNotifier(
         JellyTrackApiClient apiClient,
         ILibraryManager libraryManager,
         IMediaSourceManager mediaSourceManager,
+        PlaybackMediaStreamCache streamCache,
         ILogger<PlaybackStartNotifier> logger)
     {
         _apiClient = apiClient;
         _libraryManager = libraryManager;
         _mediaSourceManager = mediaSourceManager;
+        _streamCache = streamCache;
         _logger = logger;
     }
 
@@ -96,7 +99,8 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
                     DeviceName = session.DeviceName,
                     PlayMethod = session.PlayState?.PlayMethod?.ToString(),
                     IpAddress = session.RemoteEndPoint,
-                    PositionTicks = session.PlayState?.PositionTicks ?? 0
+                    PositionTicks = session.PlayState?.PositionTicks ?? 0,
+                    IsPaused = session.PlayState?.IsPaused
                 }
             };
         }
@@ -136,7 +140,7 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
         }
 
         // Resolution from video stream
-        var streams = _mediaSourceManager.GetMediaStreams(item.Id);
+        var streams = _streamCache.GetStreams(item.Id, () => _mediaSourceManager.GetMediaStreams(item.Id)?.ToList() ?? new List<MediaStream>());
         var videoStream = streams?.FirstOrDefault(s => s.Type == MediaStreamType.Video);
         if (videoStream is not null)
         {
@@ -191,7 +195,8 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
             DeviceName = session.DeviceName,
             PlayMethod = session.PlayState?.PlayMethod?.ToString(),
             IpAddress = session.RemoteEndPoint,
-            PositionTicks = session.PlayState?.PositionTicks ?? 0
+            PositionTicks = session.PlayState?.PositionTicks ?? 0,
+            IsPaused = session.PlayState?.IsPaused
         };
 
         // Transcoding info
@@ -204,7 +209,7 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
         }
 
         // Audio and subtitle streams
-        var streams = _mediaSourceManager.GetMediaStreams(item.Id);
+        var streams = _streamCache.GetStreams(item.Id, () => _mediaSourceManager.GetMediaStreams(item.Id)?.ToList() ?? new List<MediaStream>());
         if (streams is not null)
         {
             var audioIdx = session.PlayState?.AudioStreamIndex;

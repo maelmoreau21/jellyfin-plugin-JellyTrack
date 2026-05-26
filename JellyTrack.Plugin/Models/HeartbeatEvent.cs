@@ -36,6 +36,9 @@ public sealed class HeartbeatPluginMetrics
 
     [JsonPropertyName("lastHttpCode")]
     public int? LastHttpCode { get; set; }
+
+    [JsonPropertyName("coalescedProgressEvents")]
+    public int CoalescedProgressEvents { get; set; }
 }
 
 public sealed class HeartbeatUser

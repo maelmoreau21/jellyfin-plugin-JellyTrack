@@ -52,8 +52,64 @@
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="txtProgressInterval">Intervalle PlaybackProgress (secondes)</label>
                         <input id="txtProgressInterval" type="number" is="emby-input"
+                               min="1" max="300" step="1" />
+                        <div class="fieldDescription">Intervalle pendant la lecture active (defaut: 5 secondes)</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtPausedProgressInterval">Intervalle pause (secondes)</label>
+                        <input id="txtPausedProgressInterval" type="number" is="emby-input"
+                               min="5" max="3600" step="1" />
+                        <div class="fieldDescription">Intervalle lorsque la lecture est en pause (defaut: 30 secondes)</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtSeekThreshold">Seuil seek (secondes)</label>
+                        <input id="txtSeekThreshold" type="number" is="emby-input"
                                min="5" max="300" step="1" />
-                        <div class="fieldDescription">Intervalle entre chaque mise à jour de progression de lecture (défaut: 15 secondes)</div>
+                        <div class="fieldDescription">Ecart minimum pour signaler un saut manuel (defaut: 20 secondes)</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtRetryQueueSize">Taille maximale de la file retry</label>
+                        <input id="txtRetryQueueSize" type="number" is="emby-input"
+                               min="10" max="5000" step="1" />
+                        <div class="fieldDescription">Nombre maximum d'evenements gardes localement si JellyTrack est indisponible (defaut: 500)</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtRetryFlushBatchSize">Lot de renvoi retry</label>
+                        <input id="txtRetryFlushBatchSize" type="number" is="emby-input"
+                               min="1" max="500" step="1" />
+                        <div class="fieldDescription">Nombre maximum d'evenements renvoyes par passage lorsque JellyTrack repond a nouveau (defaut: 50)</div>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="chkTrackPauseResume" type="checkbox" is="emby-checkbox" />
+                            <span>Capturer pause et reprise immediatement</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="chkTrackSeek" type="checkbox" is="emby-checkbox" />
+                            <span>Capturer les seek immediatement</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="chkTrackAudioSubtitleChanges" type="checkbox" is="emby-checkbox" />
+                            <span>Capturer les changements audio et sous-titres</span>
+                        </label>
+                    </div>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="chkTrackSessionEnded" type="checkbox" is="emby-checkbox" />
+                            <span>Fermer les lectures quand une session se termine</span>
+                        </label>
                     </div>
 
                     <div class="inputContainer">
@@ -556,7 +612,15 @@
                     document.querySelector('#txtJellyTrackUrl').value = config.JellyTrackUrl || '';
                     document.querySelector('#txtApiKey').value = config.ApiKey || '';
                     document.querySelector('#txtHeartbeatInterval').value = normalizeHeartbeatIntervalSeconds(config.HeartbeatIntervalSeconds);
-                    document.querySelector('#txtProgressInterval').value = config.ProgressIntervalSeconds || 15;
+                    document.querySelector('#txtProgressInterval').value = config.ProgressIntervalSeconds || 5;
+                    document.querySelector('#txtPausedProgressInterval').value = config.PausedProgressIntervalSeconds || 30;
+                    document.querySelector('#txtSeekThreshold').value = config.SeekThresholdSeconds || 20;
+                    document.querySelector('#txtRetryQueueSize').value = config.RetryQueueSize || 500;
+                    document.querySelector('#txtRetryFlushBatchSize').value = config.RetryFlushBatchSize || 50;
+                    document.querySelector('#chkTrackPauseResume').checked = config.TrackPauseResume !== false;
+                    document.querySelector('#chkTrackSeek').checked = config.TrackSeek !== false;
+                    document.querySelector('#chkTrackAudioSubtitleChanges').checked = config.TrackAudioSubtitleChanges !== false;
+                    document.querySelector('#chkTrackSessionEnded').checked = config.TrackSessionEnded !== false;
                     document.querySelector('#selPreferredLanguage').value = config.PreferredLanguage || '';
 
                     // Determine effective language (config override > browser) and load translations
@@ -642,7 +706,15 @@
                     config.JellyTrackUrl = urlValue;
                     config.ApiKey = apiKeyValue;
                     config.HeartbeatIntervalSeconds = normalizeHeartbeatIntervalSeconds(document.querySelector('#txtHeartbeatInterval').value);
-                    config.ProgressIntervalSeconds = parseInt(document.querySelector('#txtProgressInterval').value, 10) || 15;
+                    config.ProgressIntervalSeconds = parseInt(document.querySelector('#txtProgressInterval').value, 10) || 5;
+                    config.PausedProgressIntervalSeconds = parseInt(document.querySelector('#txtPausedProgressInterval').value, 10) || 30;
+                    config.SeekThresholdSeconds = parseInt(document.querySelector('#txtSeekThreshold').value, 10) || 20;
+                    config.RetryQueueSize = parseInt(document.querySelector('#txtRetryQueueSize').value, 10) || 500;
+                    config.RetryFlushBatchSize = parseInt(document.querySelector('#txtRetryFlushBatchSize').value, 10) || 50;
+                    config.TrackPauseResume = document.querySelector('#chkTrackPauseResume').checked;
+                    config.TrackSeek = document.querySelector('#chkTrackSeek').checked;
+                    config.TrackAudioSubtitleChanges = document.querySelector('#chkTrackAudioSubtitleChanges').checked;
+                    config.TrackSessionEnded = document.querySelector('#chkTrackSessionEnded').checked;
                     config.PreferredLanguage = document.querySelector('#selPreferredLanguage').value || '';
 
                     ApiClient.updatePluginConfiguration(JellyTrackConfig.pluginUniqueId, config).then(function () {

@@ -148,6 +148,7 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
                     QueueDepth = runtimeMetrics.QueueDepth,
                     Retries = runtimeMetrics.RetryAttempts,
                     LastHttpCode = runtimeMetrics.LastHttpCode,
+                    CoalescedProgressEvents = runtimeMetrics.CoalescedProgressEvents,
                 },
             };
 

@@ -14,17 +14,21 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
 {
     private readonly JellyTrackApiClient _apiClient;
     private readonly IMediaSourceManager _mediaSourceManager;
+    private readonly PlaybackMediaStreamCache _streamCache;
+    private readonly PlaybackSessionTelemetryState _telemetryState;
     private readonly ILogger<PlaybackProgressNotifier> _logger;
-    private readonly Dictionary<string, DateTime> _lastProgressSent = new();
-    private readonly object _lock = new();
 
     public PlaybackProgressNotifier(
         JellyTrackApiClient apiClient,
         IMediaSourceManager mediaSourceManager,
+        PlaybackMediaStreamCache streamCache,
+        PlaybackSessionTelemetryState telemetryState,
         ILogger<PlaybackProgressNotifier> logger)
     {
         _apiClient = apiClient;
         _mediaSourceManager = mediaSourceManager;
+        _streamCache = streamCache;
+        _telemetryState = telemetryState;
         _logger = logger;
     }
 
@@ -49,22 +53,31 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             return;
         }
 
-        // Throttle progress events based on configured interval
         var sessionId = e.Session.Id;
-        var intervalSeconds = config.ProgressIntervalSeconds > 0 ? config.ProgressIntervalSeconds : 15;
-
-        lock (_lock)
-        {
-            if (_lastProgressSent.TryGetValue(sessionId, out var lastSent)
-                && (DateTime.UtcNow - lastSent).TotalSeconds < intervalSeconds)
-            {
-                return;
-            }
-
-            _lastProgressSent[sessionId] = DateTime.UtcNow;
-        }
-
         var item = e.Item;
+        var positionTicks = e.PlaybackPositionTicks ?? e.Session.PlayState?.PositionTicks ?? 0;
+        var isPaused = e.Session.PlayState?.IsPaused ?? e.IsPaused;
+        var audioStreamIndex = e.Session.PlayState?.AudioStreamIndex;
+        var subtitleStreamIndex = e.Session.PlayState?.SubtitleStreamIndex;
+
+        var decision = _telemetryState.ObserveProgress(new PlaybackProgressObservation(
+            SessionId: sessionId,
+            PositionTicks: positionTicks,
+            IsPaused: isPaused,
+            AudioStreamIndex: audioStreamIndex,
+            SubtitleStreamIndex: subtitleStreamIndex,
+            PlayingProgressIntervalSeconds: config.ProgressIntervalSeconds,
+            PausedProgressIntervalSeconds: config.PausedProgressIntervalSeconds,
+            SeekThresholdSeconds: config.SeekThresholdSeconds,
+            TrackPauseResume: config.TrackPauseResume,
+            TrackSeek: config.TrackSeek,
+            TrackAudioSubtitleChanges: config.TrackAudioSubtitleChanges,
+            TimestampUtc: DateTime.UtcNow));
+
+        if (!decision.ShouldSendProgress && decision.StateChanges.Count == 0)
+        {
+            return;
+        }
 
         _logger.LogDebug("PlaybackProgress: {User} at {Position} for {Item}", username ?? jellyfinUserId, e.PlaybackPositionTicks, item.Name);
 
@@ -89,10 +102,10 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                     DurationMs = item.RunTimeTicks.HasValue ? item.RunTimeTicks.Value / 10000 : 0,
                 },
                 Session = BuildSessionInfo(item, e.Session),
-                PositionTicks = e.PlaybackPositionTicks ?? e.Session.PlayState?.PositionTicks ?? 0,
-                IsPaused = e.Session.PlayState?.IsPaused ?? false,
-                AudioStreamIndex = e.Session.PlayState?.AudioStreamIndex,
-                SubtitleStreamIndex = e.Session.PlayState?.SubtitleStreamIndex
+                PositionTicks = positionTicks,
+                IsPaused = isPaused,
+                AudioStreamIndex = audioStreamIndex,
+                SubtitleStreamIndex = subtitleStreamIndex
             };
 
             if (item is Episode episode)
@@ -139,16 +152,22 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                     DeviceName = e.Session.DeviceName,
                     PlayMethod = e.Session.PlayState?.PlayMethod?.ToString(),
                     IpAddress = e.Session.RemoteEndPoint,
-                    PositionTicks = e.Session.PlayState?.PositionTicks ?? 0
+                    PositionTicks = e.Session.PlayState?.PositionTicks ?? 0,
+                    IsPaused = e.Session.PlayState?.IsPaused
                 },
-                PositionTicks = e.PlaybackPositionTicks ?? e.Session.PlayState?.PositionTicks ?? 0,
-                IsPaused = e.Session.PlayState?.IsPaused ?? false,
-                AudioStreamIndex = e.Session.PlayState?.AudioStreamIndex,
-                SubtitleStreamIndex = e.Session.PlayState?.SubtitleStreamIndex
+                PositionTicks = positionTicks,
+                IsPaused = isPaused,
+                AudioStreamIndex = audioStreamIndex,
+                SubtitleStreamIndex = subtitleStreamIndex
             };
         }
 
-        await _apiClient.SendEventAsync(payload).ConfigureAwait(false);
+        await SendStateChangesAsync(payload, decision.StateChanges).ConfigureAwait(false);
+
+        if (decision.ShouldSendProgress)
+        {
+            await _apiClient.SendEventAsync(payload).ConfigureAwait(false);
+        }
     }
 
     private EventSession BuildSessionInfo(BaseItem item, MediaBrowser.Controller.Session.SessionInfo session)
@@ -161,6 +180,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             PlayMethod = session.PlayState?.PlayMethod?.ToString(),
             IpAddress = session.RemoteEndPoint,
             PositionTicks = session.PlayState?.PositionTicks ?? 0,
+            IsPaused = session.PlayState?.IsPaused,
         };
 
         if (session.TranscodingInfo is not null)
@@ -171,7 +191,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             sessionInfo.AudioCodec = session.TranscodingInfo.AudioCodec;
         }
 
-        var streams = _mediaSourceManager.GetMediaStreams(item.Id);
+        var streams = _streamCache.GetStreams(item.Id, () => _mediaSourceManager.GetMediaStreams(item.Id)?.ToList() ?? new List<MediaStream>());
         if (streams is not null)
         {
             var audioIdx = session.PlayState?.AudioStreamIndex;
@@ -222,9 +242,30 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
     /// </summary>
     internal void CleanupSession(string sessionId)
     {
-        lock (_lock)
+        _telemetryState.CleanupSession(sessionId);
+    }
+
+    private async Task SendStateChangesAsync(PlaybackProgressEvent progressPayload, IReadOnlyList<PlaybackStateChange> changes)
+    {
+        foreach (var change in changes)
         {
-            _lastProgressSent.Remove(sessionId);
+            var payload = new PlaybackStateChangedEvent
+            {
+                Timestamp = DateTime.UtcNow,
+                SessionId = progressPayload.SessionId,
+                ChangeType = change.ChangeType,
+                User = progressPayload.User,
+                Media = progressPayload.Media,
+                Session = progressPayload.Session,
+                PositionTicks = progressPayload.PositionTicks,
+                PreviousPositionTicks = change.PreviousPositionTicks,
+                IsPaused = progressPayload.IsPaused,
+                AudioStreamIndex = progressPayload.AudioStreamIndex,
+                SubtitleStreamIndex = progressPayload.SubtitleStreamIndex,
+                Metadata = change.Metadata,
+            };
+
+            await _apiClient.SendEventAsync(payload).ConfigureAwait(false);
         }
     }
 }

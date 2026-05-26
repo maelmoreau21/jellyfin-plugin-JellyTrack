@@ -114,4 +114,7 @@ public sealed class EventSession
 
     [JsonPropertyName("positionTicks")]
     public long PositionTicks { get; set; }
+
+    [JsonPropertyName("isPaused")]
+    public bool? IsPaused { get; set; }
 }

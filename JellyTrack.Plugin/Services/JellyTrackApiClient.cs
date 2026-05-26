@@ -9,17 +9,18 @@ using Microsoft.Extensions.Logging;
 namespace JellyTrack.Plugin.Services;
 
 public sealed record TestConnectionResult(bool Success, HttpStatusCode? StatusCode, string Message, string Endpoint);
-public sealed record PluginRuntimeMetricsSnapshot(int QueueDepth, int RetryAttempts, int? LastHttpCode);
+public sealed record PluginRuntimeMetricsSnapshot(int QueueDepth, int RetryAttempts, int? LastHttpCode, int CoalescedProgressEvents);
 
 public class JellyTrackApiClient : IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<JellyTrackApiClient> _logger;
-    private readonly ConcurrentQueue<PluginEvent> _retryQueue = new();
+    private readonly ConcurrentQueue<QueuedPluginEvent> _retryQueue = new();
+    private readonly ConcurrentDictionary<string, PluginEvent> _coalescedProgressEvents = new();
     private int _retryAttempts;
+    private int _coalescedProgressEventsCount;
     private int? _lastHttpCode;
     private readonly object _telemetryLock = new();
-    private const int MaxQueueSize = 100;
     private const string DefaultPluginEventsPath = "/api/plugin/events";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -130,7 +131,8 @@ public class JellyTrackApiClient : IDisposable
         return new PluginRuntimeMetricsSnapshot(
             QueueDepth: _retryQueue.Count,
             RetryAttempts: Volatile.Read(ref _retryAttempts),
-            LastHttpCode: lastHttpCode);
+            LastHttpCode: lastHttpCode,
+            CoalescedProgressEvents: Volatile.Read(ref _coalescedProgressEventsCount));
     }
 
     private async Task<bool> SendSingleEventAsync(Uri endpoint, string apiKey, PluginEvent eventPayload, CancellationToken cancellationToken)
@@ -183,17 +185,41 @@ public class JellyTrackApiClient : IDisposable
 
     private void EnqueueForRetry(PluginEvent eventPayload)
     {
-        if (_retryQueue.Count >= MaxQueueSize)
+        var maxQueueSize = Plugin.Instance?.Configuration.RetryQueueSize ?? PluginConfiguration.DefaultRetryQueueSize;
+        maxQueueSize = Math.Max(10, maxQueueSize);
+
+        var coalesceKey = GetCoalesceKey(eventPayload);
+        if (coalesceKey is not null)
         {
-            _retryQueue.TryDequeue(out _);
+            if (_coalescedProgressEvents.TryAdd(coalesceKey, eventPayload))
+            {
+                _retryQueue.Enqueue(new QueuedPluginEvent(coalesceKey, eventPayload));
+            }
+            else
+            {
+                _coalescedProgressEvents[coalesceKey] = eventPayload;
+                Interlocked.Increment(ref _coalescedProgressEventsCount);
+                return;
+            }
+        }
+        else
+        {
+            _retryQueue.Enqueue(new QueuedPluginEvent(null, eventPayload));
         }
 
-        _retryQueue.Enqueue(eventPayload);
+        while (_retryQueue.Count > maxQueueSize && _retryQueue.TryDequeue(out var dropped))
+        {
+            if (dropped.CoalesceKey is not null)
+            {
+                _coalescedProgressEvents.TryRemove(dropped.CoalesceKey, out _);
+            }
+        }
     }
 
     private async Task FlushRetryQueueAsync(Uri endpoint, string apiKey, CancellationToken cancellationToken)
     {
-        var count = _retryQueue.Count;
+        var flushBatchSize = Plugin.Instance?.Configuration.RetryFlushBatchSize ?? PluginConfiguration.DefaultRetryFlushBatchSize;
+        var count = Math.Min(_retryQueue.Count, Math.Max(1, flushBatchSize));
         for (int i = 0; i < count; i++)
         {
             if (!_retryQueue.TryDequeue(out var queued))
@@ -201,10 +227,17 @@ public class JellyTrackApiClient : IDisposable
                 break;
             }
 
+            var eventToSend = queued.EventPayload;
+            if (queued.CoalesceKey is not null
+                && !_coalescedProgressEvents.TryRemove(queued.CoalesceKey, out eventToSend))
+            {
+                continue;
+            }
+
             try
             {
                 Interlocked.Increment(ref _retryAttempts);
-                using var request = BuildAuthenticatedRequest(endpoint, apiKey, queued);
+                using var request = BuildAuthenticatedRequest(endpoint, apiKey, eventToSend);
 
                 using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
                 lock (_telemetryLock)
@@ -214,17 +247,28 @@ public class JellyTrackApiClient : IDisposable
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogDebug("Retry failed for queued event {Event}, re-queuing", queued.Event);
-                    EnqueueForRetry(queued);
+                    _logger.LogDebug("Retry failed for queued event {Event}, re-queuing", eventToSend.Event);
+                    EnqueueForRetry(eventToSend);
                     break; // stop flushing if server is still down
                 }
             }
             catch (Exception)
             {
-                EnqueueForRetry(queued);
+                EnqueueForRetry(eventToSend);
                 break;
             }
         }
+    }
+
+    private static string? GetCoalesceKey(PluginEvent eventPayload)
+    {
+        if (eventPayload is PlaybackProgressEvent progress
+            && !string.IsNullOrWhiteSpace(progress.SessionId))
+        {
+            return $"PlaybackProgress:{progress.SessionId}";
+        }
+
+        return null;
     }
 
     private HttpRequestMessage BuildAuthenticatedRequest(Uri endpoint, string apiKey, PluginEvent eventPayload)
@@ -296,4 +340,6 @@ public class JellyTrackApiClient : IDisposable
     {
         _httpClient.Dispose();
     }
+
+    private sealed record QueuedPluginEvent(string? CoalesceKey, PluginEvent EventPayload);
 }

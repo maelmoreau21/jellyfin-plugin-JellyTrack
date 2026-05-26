@@ -9,13 +9,16 @@ namespace JellyTrack.Plugin.Notifiers;
 public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
 {
     private readonly JellyTrackApiClient _apiClient;
+    private readonly PlaybackSessionTelemetryState _telemetryState;
     private readonly ILogger<PlaybackStopNotifier> _logger;
 
     public PlaybackStopNotifier(
         JellyTrackApiClient apiClient,
+        PlaybackSessionTelemetryState telemetryState,
         ILogger<PlaybackStopNotifier> logger)
     {
         _apiClient = apiClient;
+        _telemetryState = telemetryState;
         _logger = logger;
     }
 
@@ -43,6 +46,7 @@ public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
         var item = e.Item;
 
         _logger.LogInformation("PlaybackStop captured: user={UserId}, item={ItemId}, session={SessionId}", jellyfinUserId, item.Id, e.Session.Id);
+        _telemetryState.CleanupSession(e.Session.Id);
 
         var payload = new PlaybackStopEvent
         {
