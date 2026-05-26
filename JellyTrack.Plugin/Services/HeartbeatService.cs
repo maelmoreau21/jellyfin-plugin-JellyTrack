@@ -34,11 +34,11 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
         _logger = logger;
     }
 
-    public string Name => "JellyTrack Heartbeat";
+    public string Name => PluginLocalization.Translate("task.heartbeat.name", PluginLocalization.GetConfiguredLanguage());
 
     public string Key => "JellyTrackHeartbeat";
 
-    public string Description => "Envoie un heartbeat périodique à JellyTrack avec la liste des utilisateurs.";
+    public string Description => PluginLocalization.Translate("task.heartbeat.description", PluginLocalization.GetConfiguredLanguage());
 
     public string Category => "JellyTrack";
 

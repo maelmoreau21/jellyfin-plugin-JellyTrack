@@ -24,15 +24,17 @@
   "config.fillFields": "Por favor, preencha tanto a URL quanto a chave API.",
   "config.pausedProgressInterval.label": "Intervalo pausado (segundos)",
   "config.pausedProgressInterval.description": "Intervalo enquanto a reproducao esta pausada (padrao: 30 segundos)",
-  "config.seekThreshold.label": "Limite de seek (segundos)",
-  "config.seekThreshold.description": "Salto minimo de posicao informado como seek manual (padrao: 20 segundos)",
+  "config.seekThreshold.label": "Manual jump threshold (seconds)",
+  "config.seekThreshold.description": "Minimum position jump reported as a manual skip or rewind (default: 20 seconds)",
   "config.retryQueueSize.label": "Tamanho maximo da fila retry",
   "config.retryQueueSize.description": "Maximo de eventos mantidos localmente quando JellyTrack esta indisponivel (padrao: 500)",
   "config.retryFlushBatchSize.label": "Tamanho do lote retry",
   "config.retryFlushBatchSize.description": "Maximo de eventos reenviados por ciclo quando JellyTrack responde novamente (padrao: 50)",
   "config.trackPauseResume": "Capturar pausa e retomada imediatamente",
-  "config.trackSeek": "Capturar eventos seek imediatamente",
+  "config.trackSeek": "Capture manual skips and rewinds immediately",
   "config.trackAudioSubtitleChanges": "Capturar mudancas de audio e legendas",
   "config.trackSessionEnded": "Fechar reproducoes quando uma sessao termina",
-  "config.preferredLanguage.auto": "Auto - usar idioma do servidor Jellyfin"
+  "config.preferredLanguage.auto": "Auto - usar idioma do servidor Jellyfin",
+  "task.heartbeat.name": "Sinal de vida JellyTrack",
+  "task.heartbeat.description": "Sends a periodic heartbeat to JellyTrack with user and plugin health information."
 }

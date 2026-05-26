@@ -24,15 +24,17 @@
   "config.fillFields": "Vul zowel de URL als de API-sleutel in.",
   "config.pausedProgressInterval.label": "Pauze-interval (seconden)",
   "config.pausedProgressInterval.description": "Interval terwijl afspelen is gepauzeerd (standaard: 30 seconden)",
-  "config.seekThreshold.label": "Seek-drempel (seconden)",
-  "config.seekThreshold.description": "Minimale positiesprong die als handmatige seek wordt gemeld (standaard: 20 seconden)",
+  "config.seekThreshold.label": "Manual jump threshold (seconds)",
+  "config.seekThreshold.description": "Minimum position jump reported as a manual skip or rewind (default: 20 seconds)",
   "config.retryQueueSize.label": "Maximale retry-wachtrij",
   "config.retryQueueSize.description": "Maximaal aantal lokaal bewaarde gebeurtenissen wanneer JellyTrack niet beschikbaar is (standaard: 500)",
   "config.retryFlushBatchSize.label": "Retry-flushbatch",
   "config.retryFlushBatchSize.description": "Maximaal aantal opnieuw verzonden gebeurtenissen per flush wanneer JellyTrack weer antwoordt (standaard: 50)",
   "config.trackPauseResume": "Pauze en hervatten direct vastleggen",
-  "config.trackSeek": "Seek-gebeurtenissen direct vastleggen",
+  "config.trackSeek": "Capture manual skips and rewinds immediately",
   "config.trackAudioSubtitleChanges": "Audio- en ondertitelwijzigingen vastleggen",
   "config.trackSessionEnded": "Afspelen sluiten wanneer een sessie eindigt",
-  "config.preferredLanguage.auto": "Auto - gebruik taal van Jellyfin-server"
+  "config.preferredLanguage.auto": "Auto - gebruik taal van Jellyfin-server",
+  "task.heartbeat.name": "JellyTrack-heartbeat",
+  "task.heartbeat.description": "Sends a periodic heartbeat to JellyTrack with user and plugin health information."
 }

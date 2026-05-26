@@ -7,7 +7,7 @@
   "overview": "Plugin Jellyfin pour pousser les evenements de lecture vers JellyTrack",
   "owner": "JellyTrack",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-05-26T18:20:16Z",
+  "timestamp": "2026-05-26T19:24:52Z",
   "version": "1.6.0.0",
   "imagePath": "Jellyfin.Plugin.JellyTrack.png",
   "assemblies": [

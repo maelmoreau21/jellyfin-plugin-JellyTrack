@@ -24,15 +24,17 @@
   "config.fillFields": "Пожалуйста, заполните как URL, так и API-ключ.",
   "config.pausedProgressInterval.label": "Interval pauzy (sekundy)",
   "config.pausedProgressInterval.description": "Interval kogda vosproizvedenie priostanovleno (po umolchaniyu: 30 sekund)",
-  "config.seekThreshold.label": "Porog seek (sekundy)",
-  "config.seekThreshold.description": "Minimalnyy skachok pozitsii, schitaemyi ruchnym seek (po umolchaniyu: 20 sekund)",
+  "config.seekThreshold.label": "Manual jump threshold (seconds)",
+  "config.seekThreshold.description": "Minimum position jump reported as a manual skip or rewind (default: 20 seconds)",
   "config.retryQueueSize.label": "Maksimalnyy razmer ocheredi retry",
   "config.retryQueueSize.description": "Maksimum sobytiy, hranimyh lokalno, kogda JellyTrack nedostupen (po umolchaniyu: 500)",
   "config.retryFlushBatchSize.label": "Razmer batch retry",
   "config.retryFlushBatchSize.description": "Maksimum sobytiy za odin flush, kogda JellyTrack snova otvechaet (po umolchaniyu: 50)",
   "config.trackPauseResume": "Srazu fiksirovat pauzu i vozobnovlenie",
-  "config.trackSeek": "Srazu fiksirovat seek",
+  "config.trackSeek": "Capture manual skips and rewinds immediately",
   "config.trackAudioSubtitleChanges": "Fiksirovat smenu audio i subtitrov",
   "config.trackSessionEnded": "Zakryvat prosmotry pri zavershenii sessii",
-  "config.preferredLanguage.auto": "Auto - ispolzovat yazyk servera Jellyfin"
+  "config.preferredLanguage.auto": "Auto - ispolzovat yazyk servera Jellyfin",
+  "task.heartbeat.name": "Heartbeat JellyTrack",
+  "task.heartbeat.description": "Sends a periodic heartbeat to JellyTrack with user and plugin health information."
 }
