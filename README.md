@@ -14,56 +14,56 @@
 </p>
 
 <p align="center">
-  <strong>Plugin Jellyfin pour JellyTrack : capture et envoie les evenements de lecture et metadonnees en temps reel vers votre serveur d'analytics.</strong>
+  <strong>Jellyfin plugin for JellyTrack: captures and sends playback events and metadata in real time to your analytics server.</strong>
 </p>
 
 ---
 
 > [!IMPORTANT]
-> ### Serveur JellyTrack requis
-> Ce plugin ne fonctionne que s'il est connecte a une instance active de **JellyTrack**. Sans serveur, le plugin n'aura aucun effet visible.
+> ### JellyTrack server required
+> This plugin only works when connected to an active **JellyTrack** instance. Without a server, it has no visible effect.
 >
-> [Deployer le serveur JellyTrack](https://github.com/maelmoreau21/JellyTrack)
+> [Deploy the JellyTrack server](https://github.com/maelmoreau21/JellyTrack)
 
 ---
 
-## Installation par depot Jellyfin
+## Install via Jellyfin repository
 
-Privilegiez l'installation via le depot officiel pour beneficier des mises a jour automatiques directement depuis votre interface Jellyfin.
+Prefer installing via the official repository to get automatic updates in Jellyfin.
 
-### 1. Ajouter le depot
+### 1. Add the repository
 
-1. Dans Jellyfin : **Tableau de bord** > **Plugins** > **Depots**.
-2. Cliquez sur le bouton `+` (Ajouter).
-3. Remplissez les informations suivantes :
-   - **Nom** : `JellyTrack`
-   - **URL** : `https://raw.githubusercontent.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/main/manifest.json`
+1. In Jellyfin: **Dashboard** > **Plugins** > **Repositories**.
+2. Click the `+` button (Add).
+3. Fill in:
+   - **Name**: `JellyTrack`
+   - **URL**: `https://raw.githubusercontent.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/main/manifest.json`
 
-### 2. Installation
+### 2. Install
 
-1. Allez dans l'onglet **Catalogue**.
-2. Recherchez **JellyTrack** et installez-le.
-3. **Redemarrez Jellyfin** pour activer le plugin.
+1. Go to the **Catalog** tab.
+2. Search for **JellyTrack** and install it.
+3. **Restart Jellyfin** to enable the plugin.
 
 ---
 
 ## Configuration
 
-Une fois installe, rendez-vous dans **Tableau de bord** > **Plugins** > **JellyTrack** pour configurer la connexion :
+Once installed, go to **Dashboard** > **Plugins** > **JellyTrack** to configure the connection:
 
-- **URL JellyTrack** : l'adresse de votre serveur, par exemple `http://192.168.1.100:3000`.
-- **Cle API** : la cle generee dans l'interface de JellyTrack, au format `jt_xxxxxxxxxxxx`.
-- **Intervalle heartbeat** : frequence de verification de sante, par defaut `600s`.
-- **Telemetrie** : le profil `Tres precis` est le defaut, avec progression toutes les `5s` en lecture et toutes les `30s` en pause.
+- **JellyTrack URL**: your server address, for example `http://192.168.1.100:3000`.
+- **API key**: the key generated in JellyTrack settings, format `jt_xxxxxxxxxxxx`.
+- **Heartbeat interval**: health check cadence, default `600s`.
+- **Telemetry**: default progress intervals are `5s` during playback and `30s` when paused.
 
 > [!TIP]
-> Utilisez le bouton **Tester la connexion** pour verifier que le plugin communique correctement avec votre serveur avant d'enregistrer.
+> Use the **Test connection** button to confirm the plugin can reach your server before saving.
 
 ---
 
 ## Build Jellyfin 10.11 public
 
-La version `1.6.0.0` cible Jellyfin `10.11.x` public avec `JellyfinPackageVersion=10.11.10` et `targetAbi=10.11.0.0`.
+Version `1.6.0.0` targets Jellyfin `10.11.x` with `JellyfinPackageVersion=10.11.10` and `targetAbi=10.11.0.0`.
 
 ```powershell
 dotnet restore .\plugin-jellytrack.sln `
@@ -74,20 +74,20 @@ dotnet build .\plugin-jellytrack.sln -c Release --no-restore `
   -warnaserror:CS0618
 ```
 
-Pour publier la version `1.6.0.0`, creez `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` depuis le build Release, puis lancez `scripts/update_manifest.py` avec `REPO=maelmoreau21/Jellyfin.Plugin.JellyTrack` et `RELEASE_TAG=v1.6.0.0` afin de calculer le checksum du vrai zip.
+To publish `1.6.0.0`, create `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` from the Release build, then run `scripts/update_manifest.py` with `REPO=maelmoreau21/Jellyfin.Plugin.JellyTrack` and `RELEASE_TAG=v1.6.0.0` to compute the checksum of the real zip.
 
 ---
 
-## Installation manuelle
+## Manual installation
 
-Si vous ne pouvez pas utiliser le depot :
+If you cannot use the repository:
 
-1. Telechargez le fichier `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` depuis les [Releases](https://github.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/releases).
-2. Creez un dossier `JellyTrack` dans votre repertoire `plugins` Jellyfin.
-3. Extrayez `meta.json`, `Jellyfin.Plugin.JellyTrack.deps.json`, `Jellyfin.Plugin.JellyTrack.dll`, `Jellyfin.Plugin.JellyTrack.pdb` et `Jellyfin.Plugin.JellyTrack.png` dedans, puis redemarrez Jellyfin.
+1. Download `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` from [Releases](https://github.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/releases).
+2. Create a `JellyTrack` folder inside your Jellyfin `plugins` directory.
+3. Extract `meta.json`, `Jellyfin.Plugin.JellyTrack.deps.json`, `Jellyfin.Plugin.JellyTrack.dll`, `Jellyfin.Plugin.JellyTrack.pdb`, and `Jellyfin.Plugin.JellyTrack.png`, then restart Jellyfin.
 
 ---
 
-## Licence
+## License
 
-Distribue sous licence **MIT**.
+Distributed under the **MIT** license.

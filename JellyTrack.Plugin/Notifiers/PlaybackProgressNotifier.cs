@@ -311,15 +311,6 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
         };
     }
 
-    /// <summary>
-    /// Clean up stale session entries to prevent memory leaks.
-    /// Called periodically or on session end.
-    /// </summary>
-    internal void CleanupSession(string sessionId)
-    {
-        _telemetryState.CleanupSession(sessionId);
-    }
-
     private async Task SendStateChangesAsync(PlaybackProgressEvent progressPayload, IReadOnlyList<PlaybackStateChange> changes)
     {
         foreach (var change in changes)

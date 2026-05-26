@@ -101,11 +101,6 @@ public sealed class PlaybackSessionTelemetryState
         _sessions.TryRemove(sessionId, out _);
     }
 
-    public void Clear()
-    {
-        _sessions.Clear();
-    }
-
     private sealed record PlaybackSessionSnapshot(
         long PositionTicks,
         bool IsPaused,
