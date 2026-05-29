@@ -61,9 +61,9 @@ Once installed, go to **Dashboard** > **Plugins** > **JellyTrack** to configure 
 
 ---
 
-## Build Jellyfin 10.11 public
+## Build Jellyfin 12.x public
 
-Version `1.6.0.0` targets Jellyfin `10.11.x` with `JellyfinPackageVersion=10.11.10` and `targetAbi=10.11.0.0`.
+Version `1.6.0.0` targets Jellyfin `12.x` (using `JellyfinPackageVersion=10.11.10` for compilation) and `targetAbi=12.0.0.0`.
 
 ```powershell
 dotnet restore .\plugin-jellytrack.sln `
@@ -90,4 +90,4 @@ If you cannot use the repository:
 
 ## License
 
-Distributed under the **MIT** license.
+Distributed under the **MIT** license. See [LICENSE](LICENSE) for more information.
