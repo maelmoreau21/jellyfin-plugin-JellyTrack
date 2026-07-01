@@ -27,7 +27,11 @@
 
 ---
 
-## Install via Jellyfin repository
+## Overview
+
+JellyTrack Plugin captures playback events and telemetry from Jellyfin and forwards them to the JellyTrack server. It is designed to stay quiet, reliable, and easy to install through the Jellyfin plugin catalog.
+
+## Installation
 
 Prefer installing via the official repository to get automatic updates in Jellyfin.
 
@@ -61,7 +65,7 @@ Once installed, go to **Dashboard** > **Plugins** > **JellyTrack** to configure 
 
 ---
 
-## Build Jellyfin 12.x public
+## Development
 
 Version `1.6.0.0` targets Jellyfin `12.x` (using `JellyfinPackageVersion=10.11.10` for compilation) and `targetAbi=12.0.0.0`.
 
