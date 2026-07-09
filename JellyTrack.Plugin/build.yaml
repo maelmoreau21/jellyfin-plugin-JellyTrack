@@ -1,8 +1,8 @@
 name: "JellyTrack"
 guid: "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d"
-version: "1.6.0.0"
+version: "1.7.0.0"
 targetAbi: "12.0.0.0"
-framework: "net9.0"
+framework: "net10.0"
 owner: "JellyTrack"
 overview: "Jellyfin plugin to push playback events to JellyTrack"
 description: >
@@ -14,6 +14,10 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.JellyTrack.dll"
 changelog: |
+  ## v1.7.0
+  - Migrate target framework to .NET 10
+  - Update dependencies for Jellyfin 12.0.0-rc2 compatibility
+
   ## v1.6.0
   - Target Jellyfin 12.0.x public releases
   - Add schema v3 telemetry with immediate pause/resume/seek/audio/subtitle/session-end events

@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
 
 jobs:
   build_and_release:
@@ -15,51 +15,80 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Get Version
+      id: get_version
+      run: |
+        VERSION=$(jq -r '.version' meta.json)
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Check if Release Exists
+      id: check_release
+      run: |
+        if gh release view "v${{ env.VERSION }}" -R "${{ github.repository }}" >/dev/null 2>&1; then
+          echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
+          echo "Release v${{ env.VERSION }} already exists. Skipping release creation."
+        else
+          echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
+        fi
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Setup .NET
+      if: env.RELEASE_EXISTS == 'false'
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
 
     - name: Restore dependencies
-      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj -p:JellyfinPackageVersion=10.11.10
+      if: env.RELEASE_EXISTS == 'false'
+      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj
 
     - name: Build and Publish
-      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -o ./publish -p:JellyfinPackageVersion=10.11.10
+      if: env.RELEASE_EXISTS == 'false'
+      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -o ./publish
 
     - name: Create Zip Archive
+      if: env.RELEASE_EXISTS == 'false'
       run: |
-        VERSION="${GITHUB_REF_NAME#v}"
         cp meta.json ./publish/meta.json
         cp assets/banner.png ./publish/Jellyfin.Plugin.JellyTrack.png
         cd ./publish
-        zip -r ../Jellyfin.Plugin.JellyTrack-${VERSION}.zip meta.json Jellyfin.Plugin.JellyTrack.deps.json Jellyfin.Plugin.JellyTrack.dll Jellyfin.Plugin.JellyTrack.pdb Jellyfin.Plugin.JellyTrack.png
+        zip -r ../Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip meta.json Jellyfin.Plugin.JellyTrack.deps.json Jellyfin.Plugin.JellyTrack.dll Jellyfin.Plugin.JellyTrack.pdb Jellyfin.Plugin.JellyTrack.png
         cd ..
 
     - name: Create GitHub Release
+      if: env.RELEASE_EXISTS == 'false'
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        files: Jellyfin.Plugin.JellyTrack-*.zip
+        tag_name: v${{ env.VERSION }}
+        files: Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip
         generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Python
+      if: env.RELEASE_EXISTS == 'false'
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
     - name: Install Python Dependencies
+      if: env.RELEASE_EXISTS == 'false'
       run: pip install pyyaml
 
     - name: Update manifest.json
+      if: env.RELEASE_EXISTS == 'false'
       run: python scripts/update_manifest.py
       env:
-        RELEASE_TAG: ${{ github.ref_name }}
+        RELEASE_TAG: v${{ env.VERSION }}
         REPO: ${{ github.repository }}
 
     - name: Commit and Push manifest.json
+      if: env.RELEASE_EXISTS == 'false'
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         git add manifest.json
-        git diff --quiet && git diff --staged --quiet || git commit -m "Update manifest.json for release ${{ github.ref_name }}"
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update manifest.json for release v${{ env.VERSION }}"
         git push origin HEAD:main
