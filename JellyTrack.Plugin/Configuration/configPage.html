@@ -3,27 +3,76 @@
 <head>
     <title>JellyTrack</title>
     <style>
-        .jellytrack-api-key-row {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+        .jellytrack-api-key-wrapper {
+            position: relative;
+            width: 100%;
+            display: flex;
             align-items: center;
-            gap: .5rem;
-            width: 100%;
         }
 
-        .jellytrack-api-key-row .emby-input,
-        .jellytrack-api-key-row input[is="emby-input"] {
+        .jellytrack-api-key-wrapper .emby-input,
+        .jellytrack-api-key-wrapper input[is="emby-input"] {
             box-sizing: border-box;
-            margin: 0;
-            min-width: 0;
             width: 100%;
+            padding-right: 5.5em;
         }
 
-        .jellytrack-api-key-row .emby-button,
-        .jellytrack-api-key-row button[is="emby-button"] {
+        .jellytrack-api-key-wrapper .jellytrack-toggle-btn {
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
             margin: 0;
-            min-width: 6.5em;
-            white-space: nowrap;
+            padding: 0.35em 0.75em;
+            min-width: 4.5em;
+            height: calc(100% - 8px);
+            font-size: 0.85em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        .jellytrack-test-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1em;
+            margin-top: 1.5em;
+        }
+
+        .jellytrack-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.4em 0.85em;
+            border-radius: 6px;
+            font-size: 0.9em;
+            font-weight: 500;
+            line-height: 1.4;
+            transition: all 0.2s ease;
+        }
+
+        .jellytrack-badge:empty {
+            display: none;
+        }
+
+        .jellytrack-badge-success {
+            background-color: rgba(46, 160, 67, 0.18);
+            color: #3fb950;
+            border: 1px solid rgba(46, 160, 67, 0.35);
+        }
+
+        .jellytrack-badge-error {
+            background-color: rgba(248, 81, 73, 0.18);
+            color: #f85149;
+            border: 1px solid rgba(248, 81, 73, 0.35);
+        }
+
+        .jellytrack-badge-loading {
+            background-color: rgba(56, 139, 253, 0.18);
+            color: #58a6ff;
+            border: 1px solid rgba(56, 139, 253, 0.35);
         }
     </style>
 </head>
@@ -57,10 +106,10 @@
 
                     <div class="inputContainer">
                         <label class="inputLabel inputLabelUnfocused" for="txtApiKey" data-i18n="config.apiKey.label">API Key</label>
-                        <div class="jellytrack-api-key-row">
+                        <div class="jellytrack-api-key-wrapper">
                             <input id="txtApiKey" type="password" is="emby-input"
                                    placeholder="jt_xxxxxxxxxxxx" />
-                            <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit"
+                            <button id="btnToggleApiKey" type="button" is="emby-button" class="raised button-submit jellytrack-toggle-btn"
                                     data-i18n="config.show">
                                 Show
                             </button>
@@ -156,11 +205,11 @@
                             <div class="fieldDescription" data-i18n="config.preferredLanguage.description">Select the UI language used by JellyTrack. Leave on 'Auto' to use Jellyfin's server language.</div>
                     </div>
 
-                    <div style="margin-top: 1em;">
+                    <div class="jellytrack-test-row">
                         <button id="btnTestConnection" type="button" is="emby-button" class="raised button-submit">
                             <span data-i18n="config.testConnection">Test connection</span>
                         </button>
-                        <span id="testResult" style="margin-left: 1em; font-weight: bold;"></span>
+                        <span id="testResult" class="jellytrack-badge"></span>
                     </div>
 
                     <div style="margin-top: 2em;">
@@ -689,10 +738,27 @@
                             status: 200,
                             data: data || {}
                         };
-                    }).catch(function (err) {
+                    }).catch(async function (err) {
                         var responseData = null;
+                        var statusCode = (err && typeof err.status === 'number') ? err.status : 0;
+
                         if (err && err.responseJSON) {
                             responseData = err.responseJSON;
+                        } else if (err && typeof err.json === 'function') {
+                            try {
+                                responseData = await err.json();
+                            } catch (_) {
+                                try {
+                                    var text = await err.text();
+                                    if (text) {
+                                        try {
+                                            responseData = JSON.parse(text);
+                                        } catch (_) {
+                                            responseData = { message: text };
+                                        }
+                                    }
+                                } catch (_) {}
+                            }
                         } else if (err && typeof err.responseText === 'string' && err.responseText) {
                             try {
                                 responseData = JSON.parse(err.responseText);
@@ -701,11 +767,15 @@
                             }
                         }
 
+                        var message = (responseData && (responseData.message || responseData.Message || responseData.error || responseData.Error))
+                            || (err && err.message)
+                            || (statusCode ? ('HTTP ' + statusCode) : 'Request failed');
+
                         return {
                             ok: false,
-                            status: (err && typeof err.status === 'number') ? err.status : 0,
+                            status: statusCode,
                             data: responseData || {
-                                message: (err && err.message) ? err.message : 'Request failed'
+                                message: message
                             }
                         };
                     });
@@ -755,13 +825,17 @@
                     }
 
                     if (!data && text) {
-                        data = { message: text };
+                        try {
+                            data = JSON.parse(text);
+                        } catch (_) {
+                            data = { message: text };
+                        }
                     }
 
                     return {
                         ok: response.ok,
                         status: response.status,
-                        data: data
+                        data: data || (response.ok ? {} : { message: 'HTTP ' + response.status })
                     };
                 }).catch(function (err) {
                     return {
@@ -820,7 +894,7 @@
                 var button = document.querySelector('#btnTestConnection');
                 var resultEl = document.querySelector('#testResult');
                 resultEl.textContent = translate('config.test.inProgress');
-                resultEl.style.color = '';
+                resultEl.className = 'jellytrack-badge jellytrack-badge-loading';
                 button.setAttribute('disabled', 'disabled');
 
                 var url = document.querySelector('#txtJellyTrackUrl').value.trim().replace(/\/+$/, '');
@@ -828,7 +902,7 @@
 
                 if (!url || !apiKey) {
                     resultEl.textContent = translate('config.fillFields');
-                    resultEl.style.color = 'red';
+                    resultEl.className = 'jellytrack-badge jellytrack-badge-error';
                     button.removeAttribute('disabled');
                     return;
                 }
@@ -844,19 +918,27 @@
                         } else {
                             resultEl.textContent = translate('config.test.connection.success.simple');
                         }
-                        resultEl.style.color = 'green';
+                        resultEl.className = 'jellytrack-badge jellytrack-badge-success';
                     } else {
-                        var message = (
+                        var rawMsg = (
                             data && (data.message || data.Message || data.error || data.Error)
                         ) ? (
                             data.message || data.Message || data.error || data.Error
                         ) : ('HTTP ' + (result && result.status ? result.status : 0));
-                        resultEl.textContent = translate('config.test.connection.error', { message: message });
-                        resultEl.style.color = 'red';
+
+                        if (typeof rawMsg === 'string' && rawMsg.trim().startsWith('{')) {
+                            try {
+                                var parsed = JSON.parse(rawMsg);
+                                rawMsg = parsed.message || parsed.Message || parsed.error || parsed.Error || rawMsg;
+                            } catch (_) {}
+                        }
+
+                        resultEl.textContent = translate('config.test.connection.error', { message: rawMsg });
+                        resultEl.className = 'jellytrack-badge jellytrack-badge-error';
                     }
                 }).catch(function (err) {
                     resultEl.textContent = translate('config.test.connection.error', { message: err.message });
-                    resultEl.style.color = 'red';
+                    resultEl.className = 'jellytrack-badge jellytrack-badge-error';
                 }).finally(function () { button.removeAttribute('disabled'); });
             });
 

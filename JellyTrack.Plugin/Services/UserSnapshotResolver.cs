@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace JellyTrack.Plugin.Services;
 
-internal static class UserSnapshotResolver
+public static class UserSnapshotResolver
 {
     public static List<HeartbeatUser> ResolveHeartbeatUsers(IUserManager userManager, ILogger logger)
     {

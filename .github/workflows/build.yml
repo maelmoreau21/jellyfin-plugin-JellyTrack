@@ -1,25 +1,35 @@
-name: Build
+name: Build & Test CI
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "develop" ]
 
 jobs:
-  build:
+  test-and-build:
+    name: Build & Test (.NET 9 & .NET 10)
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-    - name: Setup .NET
+    - name: Setup .NET SDKs
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 10.0.x
+        dotnet-version: |
+          9.0.x
+          10.0.x
 
-    - name: Restore dependencies
-      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj
+    - name: Restore Dependencies (.NET 10 / Jellyfin 12.0)
+      run: dotnet restore plugin-jellytrack.sln
 
-    - name: Build
+    - name: Run Unit Tests (.NET 10)
+      run: dotnet test JellyTrack.Plugin.Tests/JellyTrack.Plugin.Tests.csproj --no-restore --configuration Release --verbosity normal
+
+    - name: Build Plugin for Jellyfin 12.0 (.NET 10)
       run: dotnet build JellyTrack.Plugin/JellyTrack.Plugin.csproj --no-restore --configuration Release -warnaserror:CS0618
+
+    - name: Build Plugin for Jellyfin 10.11 (.NET 9)
+      run: dotnet build JellyTrack.Plugin/JellyTrack.Plugin.csproj -p:TargetFramework=net9.0 --configuration Release -warnaserror:CS0618 /restore

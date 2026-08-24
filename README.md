@@ -67,18 +67,18 @@ Once installed, go to **Dashboard** > **Plugins** > **JellyTrack** to configure 
 
 ## Development
 
-Version `1.6.0.0` targets Jellyfin `12.x` (using `JellyfinPackageVersion=10.11.10` for compilation) and `targetAbi=12.0.0.0`.
+Version `2.0.0.0` supports Jellyfin `12.x` (.NET 10, `targetAbi=12.0.0.0`) and Jellyfin `10.11.x` (.NET 9, `targetAbi=10.11.11.0`).
 
+### Build for Jellyfin 12.0 (.NET 10)
 ```powershell
-dotnet restore .\plugin-jellytrack.sln `
-  -p:JellyfinPackageVersion=10.11.10
-
-dotnet build .\plugin-jellytrack.sln -c Release --no-restore `
-  -p:JellyfinPackageVersion=10.11.10 `
-  -warnaserror:CS0618
+dotnet restore .\plugin-jellytrack.sln
+dotnet build .\plugin-jellytrack.sln -c Release --no-restore -warnaserror:CS0618
 ```
 
-To publish `1.6.0.0`, create `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` from the Release build, then run `scripts/update_manifest.py` with `REPO=maelmoreau21/Jellyfin.Plugin.JellyTrack` and `RELEASE_TAG=v1.6.0.0` to compute the checksum of the real zip.
+### Build for Jellyfin 10.11 (.NET 9)
+```powershell
+dotnet build .\JellyTrack.Plugin\JellyTrack.Plugin.csproj -c Release -p:TargetFramework=net9.0 -warnaserror:CS0618 /restore
+```
 
 ---
 
@@ -86,7 +86,7 @@ To publish `1.6.0.0`, create `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` from the R
 
 If you cannot use the repository:
 
-1. Download `Jellyfin.Plugin.JellyTrack-1.6.0.0.zip` from [Releases](https://github.com/maelmoreau21/Jellyfin.Plugin.JellyTrack/releases).
+1. Download `Jellyfin.Plugin.JellyTrack-2.0.0.0.zip` from [Releases](https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/releases).
 2. Create a `JellyTrack` folder inside your Jellyfin `plugins` directory.
 3. Extract `meta.json`, `Jellyfin.Plugin.JellyTrack.deps.json`, `Jellyfin.Plugin.JellyTrack.dll`, `Jellyfin.Plugin.JellyTrack.pdb`, and `Jellyfin.Plugin.JellyTrack.png`, then restart Jellyfin.
 

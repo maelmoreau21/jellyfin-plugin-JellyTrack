@@ -3,6 +3,8 @@ bin/
 obj/
 **/bin/
 **/obj/
+artifacts/
+*.zip
 
 # Visual Studio / Rider / VSCode
 .vs/
