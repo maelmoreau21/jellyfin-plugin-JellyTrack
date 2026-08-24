@@ -3,8 +3,7 @@ import sys
 import yaml
 import json
 import hashlib
-import urllib.request
-import urllib.error
+import datetime
 
 def get_md5(file_path):
     hash_md5 = hashlib.md5()
@@ -13,49 +12,30 @@ def get_md5(file_path):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def main():
-    repo = os.environ.get("REPO")
-    tag = os.environ.get("RELEASE_TAG")
-    
-    if not repo or not tag:
-        print("Missing REPO or RELEASE_TAG environment variables")
-        sys.exit(1)
+def update_manifest_entries(repo, tag, build_info, manifest_path="manifest.json"):
+    version = tag.lstrip('v')
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    changelog = build_info.get("changelog", "")
 
-    build_yaml_path = "JellyTrack.Plugin/build.yaml"
-    zip_name = f"Jellyfin.Plugin.JellyTrack-{tag.lstrip('v')}.zip"
-    zip_path = zip_name
-    
-    manifest_path = "manifest.json"
-
-    with open(build_yaml_path, "r", encoding="utf-8") as f:
-        build_info = yaml.safe_load(f)
-
-    checksum = get_md5(zip_path)
-    target_abi = build_info.get("targetAbi", "10.10.0.0")
-    
-    version_info = {
-        "version": tag.lstrip('v'),
-        "changelog": build_info.get("changelog", ""),
-        "targetAbi": target_abi,
-        "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{zip_name}",
-        "checksum": checksum,
-        "timestamp": ""
-    }
-
-    import datetime
-    version_info["timestamp"] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Target configurations to publish
+    targets = [
+        {
+            "targetAbi": "12.0.0.0",
+            "zip_name": f"Jellyfin.Plugin.JellyTrack-{version}.zip",
+        },
+        {
+            "targetAbi": "10.11.0.0",
+            "zip_name": f"Jellyfin.Plugin.JellyTrack-{version}-jellyfin11.zip",
+        }
+    ]
 
     manifest = []
-    
-    # Try to load existing manifest from the local file
-    print(f"Attempting to load existing manifest from {manifest_path}...")
-    try:
-        if os.path.exists(manifest_path):
+    if os.path.exists(manifest_path):
+        try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-            print("Successfully loaded existing manifest.")
-    except Exception as e:
-        print(f"Could not load existing manifest: {e}")
+        except Exception as e:
+            print(f"Could not load existing manifest: {e}")
 
     if isinstance(manifest, dict):
         manifest = [manifest]
@@ -80,24 +60,59 @@ def main():
         manifest.append(plugin_entry)
 
     plugin_entry["imageUrl"] = f"https://raw.githubusercontent.com/{repo}/main/assets/banner.png"
+    existing_versions = plugin_entry.get("versions", [])
 
-    versions = plugin_entry.get("versions", [])
-    version_exists = False
-    for i, v in enumerate(versions):
-        if v.get("version") == version_info["version"]:
-            versions[i] = version_info
-            version_exists = True
-            break
-    
-    if not version_exists:
-        versions.insert(0, version_info)
-    
-    plugin_entry["versions"] = versions
+    new_version_entries = []
+    for target in targets:
+        zip_path = target["zip_name"]
+        if os.path.exists(zip_path):
+            checksum = get_md5(zip_path)
+            entry = {
+                "version": version,
+                "changelog": changelog,
+                "targetAbi": target["targetAbi"],
+                "sourceUrl": f"https://github.com/{repo}/releases/download/{tag}/{target['zip_name']}",
+                "checksum": checksum,
+                "timestamp": timestamp
+            }
+            new_version_entries.append(entry)
+        else:
+            print(f"Warning: Zip file {zip_path} not found, skipping targetAbi {target['targetAbi']}")
+
+    # Remove existing entries with same version and targetAbi
+    filtered_versions = []
+    for v in existing_versions:
+        match = any(
+            v.get("version") == n["version"] and v.get("targetAbi") == n["targetAbi"]
+            for n in new_version_entries
+        )
+        if not match:
+            filtered_versions.append(v)
+
+    # Prepend new version entries (Jellyfin 12 first, then Jellyfin 10.11)
+    for n in reversed(new_version_entries):
+        filtered_versions.insert(0, n)
+
+    plugin_entry["versions"] = filtered_versions
 
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=4, ensure_ascii=False)
         
-    print(f"Manifest written to {manifest_path} with version {version_info['version']}")
+    print(f"Manifest written to {manifest_path} with {len(new_version_entries)} entries for version {version}")
+
+def main():
+    repo = os.environ.get("REPO")
+    tag = os.environ.get("RELEASE_TAG")
+    
+    if not repo or not tag:
+        print("Missing REPO or RELEASE_TAG environment variables")
+        sys.exit(1)
+
+    build_yaml_path = "JellyTrack.Plugin/build.yaml"
+    with open(build_yaml_path, "r", encoding="utf-8") as f:
+        build_info = yaml.safe_load(f)
+
+    update_manifest_entries(repo, tag, build_info)
 
 if __name__ == "__main__":
     main()

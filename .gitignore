@@ -25,6 +25,10 @@ artifacts/
 
 # Publish output
 publish/
+publish-*/
+publish_*
+__pycache__/
+*.pyc
 
 # Local env
 .env*

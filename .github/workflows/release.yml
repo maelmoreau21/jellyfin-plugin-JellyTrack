@@ -21,71 +21,62 @@ jobs:
         VERSION=$(jq -r '.version' meta.json)
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-    - name: Check if Release Exists
-      id: check_release
-      run: |
-        if gh release view "v${{ env.VERSION }}" -R "${{ github.repository }}" >/dev/null 2>&1; then
-          echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
-          echo "Release v${{ env.VERSION }} already exists. Skipping release creation."
-        else
-          echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
-        fi
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Setup .NET
-      if: env.RELEASE_EXISTS == 'false'
+    - name: Setup .NET SDKs
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 10.0.x
+        dotnet-version: |
+          9.0.x
+          10.0.x
 
-    - name: Restore dependencies
-      if: env.RELEASE_EXISTS == 'false'
-      run: dotnet restore JellyTrack.Plugin/JellyTrack.Plugin.csproj
+    - name: Build and Publish (.NET 10 / Jellyfin 12)
+      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -p:TargetFramework=net10.0 -o ./publish-net10
 
-    - name: Build and Publish
-      if: env.RELEASE_EXISTS == 'false'
-      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -o ./publish
+    - name: Build and Publish (.NET 9 / Jellyfin 10.11)
+      run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -p:TargetFramework=net9.0 -o ./publish-net9 /restore
 
-    - name: Create Zip Archive
-      if: env.RELEASE_EXISTS == 'false'
+    - name: Create Zip Archives
       run: |
-        cp meta.json ./publish/meta.json
-        cp assets/banner.png ./publish/Jellyfin.Plugin.JellyTrack.png
-        cd ./publish
+        # 1. Jellyfin 12 package (.NET 10)
+        cp meta.json ./publish-net10/meta.json
+        cp assets/banner.png ./publish-net10/Jellyfin.Plugin.JellyTrack.png
+        cd ./publish-net10
         zip -r ../Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip meta.json Jellyfin.Plugin.JellyTrack.deps.json Jellyfin.Plugin.JellyTrack.dll Jellyfin.Plugin.JellyTrack.pdb Jellyfin.Plugin.JellyTrack.png
         cd ..
 
-    - name: Create GitHub Release
-      if: env.RELEASE_EXISTS == 'false'
+        # 2. Jellyfin 10.11 package (.NET 9)
+        jq '.targetAbi = "10.11.0.0"' meta.json > ./publish-net9/meta.json
+        cp assets/banner.png ./publish-net9/Jellyfin.Plugin.JellyTrack.png
+        cd ./publish-net9
+        zip -r ../Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}-jellyfin11.zip meta.json Jellyfin.Plugin.JellyTrack.deps.json Jellyfin.Plugin.JellyTrack.dll Jellyfin.Plugin.JellyTrack.pdb Jellyfin.Plugin.JellyTrack.png
+        cd ..
+
+    - name: Create or Update GitHub Release
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ env.VERSION }}
-        files: Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip
+        files: |
+          Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip
+          Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}-jellyfin11.zip
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Python
-      if: env.RELEASE_EXISTS == 'false'
       uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
     - name: Install Python Dependencies
-      if: env.RELEASE_EXISTS == 'false'
       run: pip install pyyaml
 
     - name: Update manifest.json
-      if: env.RELEASE_EXISTS == 'false'
       run: python scripts/update_manifest.py
       env:
         RELEASE_TAG: v${{ env.VERSION }}
         REPO: ${{ github.repository }}
 
     - name: Commit and Push manifest.json
-      if: env.RELEASE_EXISTS == 'false'
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
