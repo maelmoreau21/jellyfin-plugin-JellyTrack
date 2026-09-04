@@ -6,6 +6,7 @@ public class PluginConfiguration : BasePluginConfiguration
 {
     public const int DefaultHeartbeatIntervalSeconds = 600;
     public const int MinimumHeartbeatIntervalSeconds = 300;
+    public const int MaximumHeartbeatIntervalSeconds = 86400;
     public const int DefaultProgressIntervalSeconds = 5;
     public const int DefaultPausedProgressIntervalSeconds = 30;
     public const int DefaultSeekThresholdSeconds = 20;
@@ -79,6 +80,11 @@ public class PluginConfiguration : BasePluginConfiguration
         if (configuredValue < MinimumHeartbeatIntervalSeconds)
         {
             return DefaultHeartbeatIntervalSeconds;
+        }
+
+        if (configuredValue > MaximumHeartbeatIntervalSeconds)
+        {
+            return MaximumHeartbeatIntervalSeconds;
         }
 
         return configuredValue;

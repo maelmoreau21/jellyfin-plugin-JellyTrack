@@ -13,15 +13,18 @@ public sealed record PluginRuntimeMetricsSnapshot(int QueueDepth, int RetryAttem
 
 public class JellyTrackApiClient : IDisposable
 {
+    public const int MaxResponseBodyChars = 4096;
+    private const string DefaultPluginEventsPath = "/api/plugin/events";
+
     private readonly HttpClient _httpClient;
     private readonly ILogger<JellyTrackApiClient> _logger;
+    private readonly bool _ownsClient;
     private readonly ConcurrentQueue<QueuedPluginEvent> _retryQueue = new();
     private readonly ConcurrentDictionary<string, PluginEvent> _coalescedProgressEvents = new();
     private int _retryAttempts;
     private int _coalescedProgressEventsCount;
     private int? _lastHttpCode;
     private readonly object _telemetryLock = new();
-    private const string DefaultPluginEventsPath = "/api/plugin/events";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -30,10 +33,30 @@ public class JellyTrackApiClient : IDisposable
     };
 
     public JellyTrackApiClient(IHttpClientFactory httpClientFactory, ILogger<JellyTrackApiClient> logger)
+        : this(CreateSafeHttpClient(), logger, ownsClient: true)
     {
-        _httpClient = httpClientFactory.CreateClient(nameof(JellyTrackApiClient));
-        _httpClient.Timeout = TimeSpan.FromSeconds(5);
-        _logger = logger;
+    }
+
+    internal JellyTrackApiClient(HttpClient httpClient, ILogger<JellyTrackApiClient> logger, bool ownsClient = false)
+    {
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _ownsClient = ownsClient;
+    }
+
+    private static HttpClient CreateSafeHttpClient()
+    {
+        var handler = new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false,
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            ConnectTimeout = TimeSpan.FromSeconds(5)
+        };
+
+        return new HttpClient(handler, disposeHandler: true)
+        {
+            Timeout = TimeSpan.FromSeconds(5)
+        };
     }
 
     public async Task<bool> SendEventAsync(PluginEvent eventPayload, CancellationToken cancellationToken = default)
@@ -81,7 +104,7 @@ public class JellyTrackApiClient : IDisposable
 
         if (!TryResolveEndpoint(normalizedUrl, out var endpoint))
         {
-            return new TestConnectionResult(false, null, "Invalid JellyTrack URL.", normalizedUrl);
+            return new TestConnectionResult(false, null, "Invalid or disallowed JellyTrack URL.", normalizedUrl);
         }
 
         try
@@ -116,7 +139,12 @@ public class JellyTrackApiClient : IDisposable
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "JellyTrack test connection request failed");
-            return new TestConnectionResult(false, null, ex.Message, endpoint.ToString());
+            return new TestConnectionResult(false, null, "Failed to connect to JellyTrack server. Verify URL and network reachability.", endpoint.ToString());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error testing connection to JellyTrack");
+            return new TestConnectionResult(false, null, "Unexpected connection error. Check server logs for details.", endpoint.ToString());
         }
     }
 
@@ -285,7 +313,75 @@ public class JellyTrackApiClient : IDisposable
         return request;
     }
 
-    private static bool TryResolveEndpoint(string configuredUrl, out Uri endpoint)
+    public static bool IsBlockedHostOrIp(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return true;
+        }
+
+        var normalizedHost = host.Trim().Trim('[', ']').ToLowerInvariant();
+
+        // Block known cloud metadata domain names
+        if (normalizedHost is "metadata.google.internal" or "metadata.azure.com" or "instance-data")
+        {
+            return true;
+        }
+
+        if (IPAddress.TryParse(normalizedHost, out var ip))
+        {
+            if (ip.IsIPv4MappedToIPv6)
+            {
+                ip = ip.MapToIPv4();
+            }
+
+            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                var bytes = ip.GetAddressBytes();
+                // Block 169.254.0.0/16 (Link-Local & Cloud Metadata IMDSv1/v2)
+                if (bytes[0] == 169 && bytes[1] == 254)
+                {
+                    return true;
+                }
+
+                // Block 224.0.0.0/4 (Multicast) and 255.255.255.255 (Broadcast)
+                if (bytes[0] >= 224)
+                {
+                    return true;
+                }
+
+                // Block 0.0.0.0/8
+                if (bytes[0] == 0)
+                {
+                    return true;
+                }
+            }
+            else if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            {
+                // Block IPv6 Link-Local (fe80::/10)
+                if (ip.IsIPv6LinkLocal)
+                {
+                    return true;
+                }
+
+                // Block IPv6 Multicast (ff00::/8)
+                if (ip.IsIPv6Multicast)
+                {
+                    return true;
+                }
+
+                // Block AWS EC2 IMDSv6 (fd00:ec2::254)
+                if (string.Equals(ip.ToString(), "fd00:ec2::254", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public static bool TryResolveEndpoint(string configuredUrl, out Uri endpoint)
     {
         endpoint = default!;
 
@@ -298,6 +394,12 @@ public class JellyTrackApiClient : IDisposable
         // Avoid accepting URLs with embedded credentials (userinfo),
         // which are easy to leak in logs and browser history.
         if (!string.IsNullOrWhiteSpace(parsed.UserInfo))
+        {
+            return false;
+        }
+
+        // Block SSRF targets (link-local, cloud metadata)
+        if (IsBlockedHostOrIp(parsed.Host))
         {
             return false;
         }
@@ -324,11 +426,15 @@ public class JellyTrackApiClient : IDisposable
         return "/" + trimmed;
     }
 
-    private static async Task<string> ReadResponseBodyAsync(HttpResponseMessage response)
+    internal static async Task<string> ReadResponseBodyAsync(HttpResponseMessage response)
     {
         try
         {
-            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            var buffer = new char[MaxResponseBodyChars];
+            var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            return new string(buffer, 0, charsRead);
         }
         catch
         {
@@ -338,7 +444,10 @@ public class JellyTrackApiClient : IDisposable
 
     public void Dispose()
     {
-        _httpClient.Dispose();
+        if (_ownsClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 
     private sealed record QueuedPluginEvent(string? CoalesceKey, PluginEvent EventPayload);

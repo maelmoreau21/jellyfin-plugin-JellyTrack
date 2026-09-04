@@ -1,4 +1,7 @@
+using System.IO;
+using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using JellyTrack.Plugin.Models;
 using JellyTrack.Plugin.Services;
 using MediaBrowser.Controller;
@@ -6,8 +9,6 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System.IO;
-using System.Linq;
 
 namespace JellyTrack.Plugin.Api;
 
@@ -33,14 +34,23 @@ public class JellyTrackController : ControllerBase
         _logger = logger;
     }
 
-
-
     [HttpGet("Localization/{lang}")]
+    [AllowAnonymous]
     [ProducesResponseType((int)HttpStatusCode.OK)]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.NotFound)]
     public ActionResult GetLocalization(string lang)
     {
-        if (string.IsNullOrWhiteSpace(lang)) lang = "en";
+        if (string.IsNullOrWhiteSpace(lang))
+        {
+            lang = "en";
+        }
+
+        // Validate language code format (e.g., "en", "en-US", "fr", "pt-BR", max 10 chars)
+        if (lang.Length > 10 || !Regex.IsMatch(lang, "^[a-zA-Z0-9_-]{2,10}$"))
+        {
+            return BadRequest(new { Message = "Invalid language code format." });
+        }
 
         var assembly = typeof(JellyTrackController).Assembly;
         var tried = new[]
@@ -68,10 +78,9 @@ public class JellyTrackController : ControllerBase
     [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     [ProducesResponseType((int)HttpStatusCode.ServiceUnavailable)]
     [ProducesResponseType((int)HttpStatusCode.InternalServerError)]
-    public async Task<ActionResult> TestConnection([FromBody] TestRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult> TestConnection([FromBody] TestRequest? request, CancellationToken cancellationToken)
     {
-
-        if (string.IsNullOrWhiteSpace(request.Url) || string.IsNullOrWhiteSpace(request.ApiKey))
+        if (request is null || string.IsNullOrWhiteSpace(request.Url) || string.IsNullOrWhiteSpace(request.ApiKey))
         {
             return BadRequest(new TestConnectionResponse
             {
@@ -113,7 +122,7 @@ public class JellyTrackController : ControllerBase
             return StatusCode((int)HttpStatusCode.InternalServerError, new TestConnectionResponse
             {
                 Success = false,
-                Message = ex.Message
+                Message = "An unexpected error occurred while testing connection. Check server logs."
             });
         }
     }
@@ -125,7 +134,6 @@ public class JellyTrackController : ControllerBase
     [ProducesResponseType((int)HttpStatusCode.ServiceUnavailable)]
     public async Task<ActionResult> SendHeartbeatNow(CancellationToken cancellationToken)
     {
-
         var config = Plugin.Instance?.Configuration;
         if (config is null || !config.Enabled)
         {

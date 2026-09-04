@@ -629,32 +629,48 @@
             var currentLang = 'en';
             var DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 600;
             var MINIMUM_HEARTBEAT_INTERVAL_SECONDS = 300;
+            var MAXIMUM_HEARTBEAT_INTERVAL_SECONDS = 86400;
 
             function normalizeHeartbeatIntervalSeconds(value) {
                 var parsed = parseInt(value, 10);
                 if (!isFinite(parsed) || parsed < MINIMUM_HEARTBEAT_INTERVAL_SECONDS) {
                     return DEFAULT_HEARTBEAT_INTERVAL_SECONDS;
                 }
+                if (parsed > MAXIMUM_HEARTBEAT_INTERVAL_SECONDS) {
+                    return MAXIMUM_HEARTBEAT_INTERVAL_SECONDS;
+                }
 
                 return parsed;
             }
 
+            function isSafeLocale(code) {
+                if (!code || typeof code !== 'string') return false;
+                var trimmed = code.trim();
+                if (trimmed === '__proto__' || trimmed === 'constructor' || trimmed === 'prototype') return false;
+                return /^[a-zA-Z0-9_-]{2,10}$/.test(trimmed);
+            }
+
             function pickLocale(code) {
-                if (!code) return 'en';
+                if (!isSafeLocale(code)) return 'en';
                 code = code.trim();
-                if (i18n[code]) return code;
+                if (Object.prototype.hasOwnProperty.call(i18n, code)) return code;
                 var base = code.split('-')[0];
-                if (i18n[base]) return base;
+                if (isSafeLocale(base) && Object.prototype.hasOwnProperty.call(i18n, base)) return base;
                 return 'en';
             }
 
             function translate(key, vars, langOverride) {
-                var lang = langOverride ? pickLocale(langOverride) : pickLocale(currentLang || (navigator.language || navigator.userLanguage || 'en'));
-                var dict = i18n[lang] || i18n['en'];
-                var msg = dict[key] || (i18n['en'] && i18n['en'][key]) || key;
-                if (vars) {
+                var lang = (langOverride && isSafeLocale(langOverride))
+                    ? pickLocale(langOverride)
+                    : pickLocale(currentLang || (navigator.language || navigator.userLanguage || 'en'));
+                var dict = (Object.prototype.hasOwnProperty.call(i18n, lang) && i18n[lang]) || i18n['en'] || {};
+                var msg = (dict && dict[key]) || (i18n['en'] && i18n['en'][key]) || key;
+                if (vars && typeof vars === 'object') {
                     Object.keys(vars).forEach(function (k) {
-                        msg = msg.replace(new RegExp('\{' + k + '\}', 'g'), vars[k]);
+                        if (k && k !== '__proto__' && k !== 'constructor' && k !== 'prototype') {
+                            var val = vars[k] != null ? String(vars[k]) : '';
+                            msg = msg.split('{' + k + '}').join(val);
+                        }
                     });
                 }
                 return msg;
@@ -688,22 +704,44 @@
             }
 
             function loadLocale(lang) {
-                var target = lang || (navigator.language || navigator.userLanguage || 'en');
+                var target = isSafeLocale(lang) ? lang : (isSafeLocale(navigator.language) ? navigator.language : (isSafeLocale(navigator.userLanguage) ? navigator.userLanguage : 'en'));
                 var baseUrl = getLocalizationBaseUrl();
                 var tried = [];
-                if (target) tried.push(target);
+                if (target && isSafeLocale(target)) tried.push(target);
                 var base = (target && target.indexOf('-') !== -1) ? target.split('-')[0] : null;
-                if (base && tried.indexOf(base) === -1) tried.push(base);
+                if (base && isSafeLocale(base) && tried.indexOf(base) === -1) tried.push(base);
                 if (tried.indexOf('en') === -1) tried.push('en');
 
                 var attempt = function (index) {
                     if (index >= tried.length) return Promise.resolve('en');
                     var l = tried[index];
+                    if (!isSafeLocale(l)) return attempt(index + 1);
                     var url = baseUrl + '/' + encodeURIComponent(l);
-                    return fetch(url).then(function (resp) {
+
+                    var headers = {};
+                    var token = null;
+                    if (window.ApiClient) {
+                        if (typeof ApiClient.accessToken === 'function') {
+                            token = ApiClient.accessToken();
+                        } else if (ApiClient._serverInfo && ApiClient._serverInfo.AccessToken) {
+                            token = ApiClient._serverInfo.AccessToken;
+                        } else if (ApiClient._currentUser && ApiClient._currentUser.AccessToken) {
+                            token = ApiClient._currentUser.AccessToken;
+                        }
+                    }
+                    var safeToken = token ? String(token).replace(/"/g, '') : '';
+                    if (safeToken) {
+                        headers.Authorization = 'MediaBrowser Token="' + safeToken + '"';
+                        headers['X-Emby-Token'] = safeToken;
+                        headers['X-MediaBrowser-Token'] = safeToken;
+                    }
+
+                    return fetch(url, { headers: headers, credentials: 'same-origin' }).then(function (resp) {
                         if (!resp.ok) throw new Error('not found');
                         return resp.json().then(function (json) {
-                            i18n[l] = json;
+                            if (json && typeof json === 'object' && !Array.isArray(json) && isSafeLocale(l)) {
+                                i18n[l] = json;
+                            }
                             return l;
                         });
                     }).catch(function () {

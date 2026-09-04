@@ -23,6 +23,7 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
     private Timer? _debounceTimer;
     private readonly object _timerLock = new();
     private const int DebounceSeconds = 30;
+    private const int MaxPendingItems = 1000;
 
     public LibraryChangeNotifier(
         ILibraryManager libraryManager,
@@ -70,6 +71,18 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
         }
 
         _pendingItems.TryAdd(item.Id, item);
+
+        if (_pendingItems.Count >= MaxPendingItems)
+        {
+            lock (_timerLock)
+            {
+                _debounceTimer?.Dispose();
+                _debounceTimer = null;
+            }
+
+            _ = FlushPendingItemsAsync();
+            return;
+        }
 
         // Reset the debounce timer
         lock (_timerLock)

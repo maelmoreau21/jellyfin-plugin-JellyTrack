@@ -1,14 +1,14 @@
 {
   "category": "General",
-  "changelog": "JellyTrack Plugin v2.0.0.0: Public 2.0 release. Compatibility with Jellyfin 12.0 (.NET 10) & 10.11 (.NET 9), improved configuration UI with full-width API key and status badges, updated all dependencies.",
+  "changelog": "JellyTrack Plugin v2.0.0.1: Security hardening and stability release. SSRF protection against cloud metadata endpoints, HTTP redirect token leakage prevention, bounded response reading and in-memory caches, configuration UI hardening against prototype pollution and ReDoS.",
   "description": "JellyTrack is an analytics dashboard for Jellyfin. This plugin intercepts playback events, library changes and sends a periodic heartbeat to the JellyTrack server.",
   "guid": "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d",
   "name": "JellyTrack",
   "overview": "Jellyfin plugin to push playback events to JellyTrack",
   "owner": "JellyTrack",
   "targetAbi": "12.0.0.0",
-  "timestamp": "2026-08-24T18:30:00Z",
-  "version": "2.0.0.0",
+  "timestamp": "2026-09-04T13:00:00Z",
+  "version": "2.0.0.1",
   "imagePath": "Jellyfin.Plugin.JellyTrack.png",
   "assemblies": [
     "Jellyfin.Plugin.JellyTrack.dll"

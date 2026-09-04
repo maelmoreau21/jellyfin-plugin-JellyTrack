@@ -1,6 +1,6 @@
 name: "JellyTrack"
 guid: "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d"
-version: "2.0.0.0"
+version: "2.0.0.1"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "JellyTrack"
@@ -14,6 +14,14 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.JellyTrack.dll"
 changelog: |
+  ## v2.0.0.1
+  - Security hardening: SSRF & cloud metadata protection (AWS, Azure, GCP metadata endpoints)
+  - Prevent token leakage by disabling automatic HTTP redirects in API client
+  - Bounded response buffer to protect against memory exhaustion from oversized responses
+  - Bounded capacities on in-memory caches (media stream cache, session telemetry, library change notifier)
+  - Hardened configuration UI against prototype pollution and ReDoS
+  - Controller validation for localization language codes and sanitized error responses
+
   ## v2.0.0
   - Public 2.0 release matching JellyTrack v2.0
   - Official support for Jellyfin 12.0 (.NET 10) and Jellyfin 10.11 (.NET 9)

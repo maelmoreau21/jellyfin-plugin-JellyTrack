@@ -129,7 +129,7 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
         try
         {
             LogContainerLocalhostHint(config.JellyTrackUrl);
-            var pluginVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
+            var pluginVersion = Plugin.Instance?.Version.ToString() ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0.0";
 
             var users = UserSnapshotResolver.ResolveHeartbeatUsers(_userManager, _logger);
             var runtimeMetrics = _apiClient.GetRuntimeMetricsSnapshot();

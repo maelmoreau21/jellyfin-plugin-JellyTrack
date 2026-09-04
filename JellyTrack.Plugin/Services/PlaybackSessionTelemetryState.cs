@@ -4,11 +4,14 @@ namespace JellyTrack.Plugin.Services;
 
 public sealed class PlaybackSessionTelemetryState
 {
+    public const int MaxTrackedSessions = 500;
+    private static readonly TimeSpan StaleSessionThreshold = TimeSpan.FromHours(24);
     private readonly ConcurrentDictionary<string, PlaybackSessionSnapshot> _sessions = new();
 
     public PlaybackProgressDecision ObserveProgress(PlaybackProgressObservation observation)
     {
         var now = observation.TimestampUtc;
+        CleanupStaleSessionsIfNeeded(now);
         var thresholdTicks = Math.Max(1, observation.SeekThresholdSeconds) * 10_000_000L;
         var interval = TimeSpan.FromSeconds(observation.IsPaused
             ? Math.Max(1, observation.PausedProgressIntervalSeconds)
@@ -99,6 +102,31 @@ public sealed class PlaybackSessionTelemetryState
     public void CleanupSession(string sessionId)
     {
         _sessions.TryRemove(sessionId, out _);
+    }
+
+    private void CleanupStaleSessionsIfNeeded(DateTime now)
+    {
+        if (_sessions.Count < 50)
+        {
+            return;
+        }
+
+        foreach (var kvp in _sessions)
+        {
+            if (now - kvp.Value.LastSeenUtc > StaleSessionThreshold)
+            {
+                _sessions.TryRemove(kvp.Key, out _);
+            }
+        }
+
+        if (_sessions.Count >= MaxTrackedSessions)
+        {
+            var keysToRemove = _sessions.Keys.Take(_sessions.Count - (MaxTrackedSessions / 2)).ToList();
+            foreach (var key in keysToRemove)
+            {
+                _sessions.TryRemove(key, out _);
+            }
+        }
     }
 
     private sealed record PlaybackSessionSnapshot(
