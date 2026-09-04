@@ -9,8 +9,9 @@
 <h1 align="center">JellyTrack Plugin</h1>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/maelmoreau21/Jellyfin.Plugin.JellyTrack" alt="GitHub Release">
-  <img src="https://img.shields.io/github/license/maelmoreau21/Jellyfin.Plugin.JellyTrack" alt="License">
+  <a href="https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/actions/workflows/build.yml"><img src="https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/actions/workflows/build.yml/badge.svg" alt="Build & Test CI"></a>
+  <img src="https://img.shields.io/github/v/release/maelmoreau21/jellyfin-plugin-JellyTrack" alt="GitHub Release">
+  <img src="https://img.shields.io/github/license/maelmoreau21/jellyfin-plugin-JellyTrack" alt="License">
 </p>
 
 <p align="center">

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build_and_release:
@@ -27,6 +28,12 @@ jobs:
         dotnet-version: |
           9.0.x
           10.0.x
+
+    - name: Restore Dependencies
+      run: dotnet restore plugin-jellytrack.sln
+
+    - name: Run Automated Tests
+      run: dotnet test JellyTrack.Plugin.Tests/JellyTrack.Plugin.Tests.csproj --no-restore --configuration Release --verbosity normal
 
     - name: Build and Publish (.NET 10 / Jellyfin 12)
       run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release -p:TargetFramework=net10.0 -o ./publish-net10
