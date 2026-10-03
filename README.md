@@ -68,7 +68,7 @@ Once installed, go to **Dashboard** > **Plugins** > **JellyTrack** to configure 
 
 ## Development
 
-Version `2.0.0.1` supports Jellyfin `12.x` (.NET 10, `targetAbi=12.0.0.0`) and Jellyfin `10.11.x` (.NET 9, `targetAbi=10.11.11.0`).
+Version `2.0.0.2` supports Jellyfin `12.x` (.NET 10, `targetAbi=12.0.0.0`) and Jellyfin `10.11.x` (.NET 9, `targetAbi=10.11.11.0`).
 
 ### Build for Jellyfin 12.0 (.NET 10)
 ```powershell
@@ -87,7 +87,7 @@ dotnet build .\JellyTrack.Plugin\JellyTrack.Plugin.csproj -c Release -p:TargetFr
 
 If you cannot use the repository:
 
-1. Download `Jellyfin.Plugin.JellyTrack-2.0.0.1.zip` from [Releases](https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/releases).
+1. Download `Jellyfin.Plugin.JellyTrack-2.0.0.2.zip` from [Releases](https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/releases).
 2. Create a `JellyTrack` folder inside your Jellyfin `plugins` directory.
 3. Extract `meta.json`, `Jellyfin.Plugin.JellyTrack.deps.json`, `Jellyfin.Plugin.JellyTrack.dll`, `Jellyfin.Plugin.JellyTrack.pdb`, and `Jellyfin.Plugin.JellyTrack.png`, then restart Jellyfin.
 

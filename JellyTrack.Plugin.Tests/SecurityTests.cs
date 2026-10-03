@@ -17,12 +17,19 @@ public sealed class SecurityTests
     [InlineData("169.254.169.254")]
     [InlineData("169.254.0.1")]
     [InlineData("169.254.254.254")]
+    [InlineData("100.100.100.200")]
     [InlineData("fe80::1")]
     [InlineData("fe80::dead:beef:1")]
     [InlineData("fd00:ec2::254")]
+    [InlineData("::")]
     [InlineData("metadata.google.internal")]
     [InlineData("metadata.azure.com")]
+    [InlineData("sub.metadata.azure.com")]
     [InlineData("instance-data")]
+    [InlineData("sub.instance-data")]
+    [InlineData("169.254.169.254.nip.io")]
+    [InlineData("169-254-169-254.sslip.io")]
+    [InlineData("100.100.100.200.nip.io")]
     [InlineData("224.0.0.1")]
     [InlineData("255.255.255.255")]
     [InlineData("0.0.0.0")]
@@ -155,5 +162,37 @@ public sealed class SecurityTests
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         var response = Assert.IsType<JellyTrackController.TestConnectionResponse>(badRequest.Value);
         Assert.False(response.Success);
+    }
+
+    [Fact]
+    public async Task JellyTrackController_TestConnection_RejectsOversizedInputs()
+    {
+        var apiClient = new JellyTrackApiClient(
+            new HttpClient(),
+            NullLogger<JellyTrackApiClient>.Instance);
+
+        var controller = new JellyTrackController(
+            apiClient,
+            null!,
+            null!,
+            NullLogger<JellyTrackController>.Instance);
+
+        // Oversized URL (>2048 chars)
+        var longUrl = "http://example.com/" + new string('a', 2100);
+        var resultUrl = await controller.TestConnection(
+            new JellyTrackController.TestRequest { Url = longUrl, ApiKey = "valid-key" },
+            CancellationToken.None);
+        var badRequestUrl = Assert.IsType<BadRequestObjectResult>(resultUrl);
+        var responseUrl = Assert.IsType<JellyTrackController.TestConnectionResponse>(badRequestUrl.Value);
+        Assert.False(responseUrl.Success);
+
+        // Oversized ApiKey (>256 chars)
+        var longKey = new string('k', 300);
+        var resultKey = await controller.TestConnection(
+            new JellyTrackController.TestRequest { Url = "http://example.com", ApiKey = longKey },
+            CancellationToken.None);
+        var badRequestKey = Assert.IsType<BadRequestObjectResult>(resultKey);
+        var responseKey = Assert.IsType<JellyTrackController.TestConnectionResponse>(badRequestKey.Value);
+        Assert.False(responseKey.Success);
     }
 }

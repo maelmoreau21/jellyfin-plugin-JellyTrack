@@ -1,6 +1,6 @@
 name: "JellyTrack"
 guid: "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d"
-version: "2.0.0.1"
+version: "2.0.0.2"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "JellyTrack"
@@ -14,6 +14,13 @@ category: "General"
 artifacts:
   - "Jellyfin.Plugin.JellyTrack.dll"
 changelog: |
+  ## v2.0.0.2
+  - Security audit and hardening release
+  - Extended SSRF protection against cloud metadata endpoints (Alibaba IMDS 100.100.100.200, Azure, subdomains, and wildcard DNS evasion like nip.io/sslip.io)
+  - Unhandled exception resilience in background worker task to protect Jellyfin host stability
+  - Input length validation bounds for administrative TestConnection endpoint
+  - Upstream response stream sanitization filtering control characters and explicit UTF-8 JSON encoding
+
   ## v2.0.0.1
   - Security hardening: SSRF & cloud metadata protection (AWS, Azure, GCP metadata endpoints)
   - Prevent token leakage by disabling automatic HTTP redirects in API client

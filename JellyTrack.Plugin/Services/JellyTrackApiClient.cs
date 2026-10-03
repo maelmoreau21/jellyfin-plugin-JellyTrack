@@ -209,6 +209,12 @@ public class JellyTrackApiClient : IDisposable
             EnqueueForRetry(eventPayload);
             return false;
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error sending event {Event} to JellyTrack", eventPayload.Event);
+            EnqueueForRetry(eventPayload);
+            return false;
+        }
     }
 
     private void EnqueueForRetry(PluginEvent eventPayload)
@@ -322,8 +328,21 @@ public class JellyTrackApiClient : IDisposable
 
         var normalizedHost = host.Trim().Trim('[', ']').ToLowerInvariant();
 
-        // Block known cloud metadata domain names
-        if (normalizedHost is "metadata.google.internal" or "metadata.azure.com" or "instance-data")
+        // Block known cloud metadata domain names and subdomains
+        if (normalizedHost is "metadata.google.internal" or "metadata.azure.com" or "metadata.internal" or "instance-data" or "100.100.100.200"
+            || normalizedHost.EndsWith(".metadata.google.internal", StringComparison.Ordinal)
+            || normalizedHost.EndsWith(".metadata.azure.com", StringComparison.Ordinal)
+            || normalizedHost.EndsWith(".metadata.internal", StringComparison.Ordinal)
+            || normalizedHost.EndsWith(".instance-data", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Block embedded cloud metadata IP domains (e.g., 169.254.169.254.nip.io, 169-254-169-254.sslip.io)
+        if (normalizedHost.Contains("169.254.", StringComparison.Ordinal)
+            || normalizedHost.Contains("169-254-", StringComparison.Ordinal)
+            || normalizedHost.Contains("100.100.100.200", StringComparison.Ordinal)
+            || normalizedHost.Contains("100-100-100-200", StringComparison.Ordinal))
         {
             return true;
         }
@@ -340,6 +359,12 @@ public class JellyTrackApiClient : IDisposable
                 var bytes = ip.GetAddressBytes();
                 // Block 169.254.0.0/16 (Link-Local & Cloud Metadata IMDSv1/v2)
                 if (bytes[0] == 169 && bytes[1] == 254)
+                {
+                    return true;
+                }
+
+                // Block Alibaba Cloud Metadata IP (100.100.100.200)
+                if (bytes[0] == 100 && bytes[1] == 100 && bytes[2] == 100 && bytes[3] == 200)
                 {
                     return true;
                 }
@@ -372,6 +397,12 @@ public class JellyTrackApiClient : IDisposable
 
                 // Block AWS EC2 IMDSv6 (fd00:ec2::254)
                 if (string.Equals(ip.ToString(), "fd00:ec2::254", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+
+                // Block IPv6 Any (::)
+                if (ip.Equals(IPAddress.IPv6Any))
                 {
                     return true;
                 }
@@ -434,7 +465,18 @@ public class JellyTrackApiClient : IDisposable
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var buffer = new char[MaxResponseBodyChars];
             var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
-            return new string(buffer, 0, charsRead);
+            if (charsRead <= 0) return string.Empty;
+
+            var sb = new StringBuilder(charsRead);
+            for (int i = 0; i < charsRead; i++)
+            {
+                var c = buffer[i];
+                if (!char.IsControl(c) || c == '\r' || c == '\n' || c == '\t')
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
         }
         catch
         {

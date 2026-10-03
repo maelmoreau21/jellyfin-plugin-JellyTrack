@@ -66,7 +66,7 @@ public class JellyTrackController : ControllerBase
             if (stream is null) continue;
             using var reader = new StreamReader(stream);
             var json = reader.ReadToEnd();
-            return Content(json, "application/json");
+            return Content(json, "application/json; charset=utf-8");
         }
 
         return NotFound();
@@ -86,6 +86,15 @@ public class JellyTrackController : ControllerBase
             {
                 Success = false,
                 Message = "URL and API Key are required."
+            });
+        }
+
+        if (request.Url.Length > 2048 || request.ApiKey.Length > 256)
+        {
+            return BadRequest(new TestConnectionResponse
+            {
+                Success = false,
+                Message = "URL or API Key exceeds maximum allowed length."
             });
         }
 
