@@ -1,35 +1,98 @@
-name: Prepare release archive (no publication)
+name: Release
 
 on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  prepare:
+  release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read Version
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' meta.json)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-      - run: dotnet restore
-      - run: dotnet build -c Release --no-restore
-      - run: dotnet test -c Release --no-build
-      - run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release --no-restore -o publish
-      - uses: actions/setup-python@v5
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test
+        run: dotnet test -c Release --no-build
+
+      - name: Publish plugin
+        run: dotnet publish JellyTrack.Plugin/JellyTrack.Plugin.csproj -c Release --no-restore -o publish
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - run: pip install pyyaml
-      - run: python -m unittest discover -s scripts -p 'test_*.py'
-      - name: Package and prepare manifest
+
+      - name: Install Python Dependencies
+        run: |
+          pip install pyyaml
+          python -m unittest discover -s scripts -p 'test_*.py'
+
+      - name: Package Release & Calculate Checksum
         run: python scripts/package_release.py
         env:
           REPO: ${{ github.repository }}
-      - uses: actions/upload-artifact@v4
+
+      - name: Check if Release Exists
+        id: check_release
+        run: |
+          if gh release view "v${{ env.VERSION }}" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "RELEASE_EXISTS=true" >> $GITHUB_ENV
+            echo "Release v${{ env.VERSION }} already exists."
+          else
+            echo "RELEASE_EXISTS=false" >> $GITHUB_ENV
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        if: env.RELEASE_EXISTS == 'false'
+        uses: softprops/action-gh-release@v2
         with:
-          name: jellytrack-jellyfin12-release-candidate
-          path: |
-            artifacts/*.zip
-            artifacts/manifest.json
+          tag_name: v${{ env.VERSION }}
+          name: v${{ env.VERSION }}
+          files: |
+            artifacts/Jellyfin.Plugin.JellyTrack-${{ env.VERSION }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update manifest.json in repository
+        run: |
+          cp artifacts/manifest.json ./manifest.json
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          if git diff --staged --quiet; then
+            echo "manifest.json is already up to date."
+          else
+            git commit -m "Update manifest.json for release v${{ env.VERSION }} [skip ci]"
+            git push origin HEAD:main
+          fi
+
