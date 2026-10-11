@@ -17,25 +17,20 @@ def update_manifest_entries(repo, tag, build_info, manifest_path="manifest.json"
     timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
     changelog = build_info.get("changelog", "")
 
-    # Target configurations to publish
-    targets = [
-        {
-            "targetAbi": "12.0.0.0",
-            "zip_name": f"Jellyfin.Plugin.JellyTrack-{version}.zip",
-        },
-        {
-            "targetAbi": "10.11.0.0",
-            "zip_name": f"Jellyfin.Plugin.JellyTrack-{version}-jellyfin11.zip",
-        }
-    ]
+    abi = build_info["targetAbi"]
+    if build_info.get("framework") != "net10.0" or int(abi.split(".")[0]) < 12:
+        raise ValueError("Only .NET 10 / Jellyfin 12+ packages may be advertised")
+    targets = [{"targetAbi": abi, "zip_name": f"Jellyfin.Plugin.JellyTrack-{version}.zip"}]
+    if not os.path.isfile(targets[0]["zip_name"]):
+        raise FileNotFoundError(targets[0]["zip_name"])
 
     manifest = []
     if os.path.exists(manifest_path):
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-        except Exception as e:
-            print(f"Could not load existing manifest: {e}")
+        except (OSError, json.JSONDecodeError) as e:
+            raise ValueError(f"Could not load existing manifest: {e}") from e
 
     if isinstance(manifest, dict):
         manifest = [manifest]
@@ -60,7 +55,8 @@ def update_manifest_entries(repo, tag, build_info, manifest_path="manifest.json"
         manifest.append(plugin_entry)
 
     plugin_entry["imageUrl"] = f"https://raw.githubusercontent.com/{repo}/main/assets/banner.png"
-    existing_versions = plugin_entry.get("versions", [])
+    existing_versions = [v for v in plugin_entry.get("versions", [])
+                         if int(v.get("targetAbi", "0").split(".")[0]) >= 12]
 
     new_version_entries = []
     for target in targets:
@@ -89,7 +85,7 @@ def update_manifest_entries(repo, tag, build_info, manifest_path="manifest.json"
         if not match:
             filtered_versions.append(v)
 
-    # Prepend new version entries (Jellyfin 12 first, then Jellyfin 10.11)
+    # Prepend the single Jellyfin 12+ package
     for n in reversed(new_version_entries):
         filtered_versions.insert(0, n)
 

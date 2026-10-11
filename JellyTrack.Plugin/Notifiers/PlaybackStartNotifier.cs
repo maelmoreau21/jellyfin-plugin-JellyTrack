@@ -16,6 +16,7 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
     private readonly ILibraryManager _libraryManager;
     private readonly IMediaSourceManager _mediaSourceManager;
     private readonly PlaybackMediaStreamCache _streamCache;
+    private readonly PlaybackSessionTelemetryState _telemetryState;
     private readonly ILogger<PlaybackStartNotifier> _logger;
 
     public PlaybackStartNotifier(
@@ -23,12 +24,14 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
         ILibraryManager libraryManager,
         IMediaSourceManager mediaSourceManager,
         PlaybackMediaStreamCache streamCache,
+        PlaybackSessionTelemetryState telemetryState,
         ILogger<PlaybackStartNotifier> logger)
     {
         _apiClient = apiClient;
         _libraryManager = libraryManager;
         _mediaSourceManager = mediaSourceManager;
         _streamCache = streamCache;
+        _telemetryState = telemetryState;
         _logger = logger;
     }
 
@@ -105,6 +108,12 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
             };
         }
 
+        payload.Session.PositionTicks = e.PlaybackPositionTicks ?? payload.Session.PositionTicks;
+        _telemetryState.InitializeSession(new PlaybackProgressObservation(
+            session.Id, payload.Session.PositionTicks, session.PlayState?.IsPaused ?? false,
+            session.PlayState?.AudioStreamIndex, session.PlayState?.SubtitleStreamIndex,
+            config.ProgressIntervalSeconds, config.PausedProgressIntervalSeconds, config.SeekThresholdSeconds,
+            config.TrackPauseResume, config.TrackSeek, config.TrackAudioSubtitleChanges, payload.Timestamp));
         await _apiClient.SendEventAsync(payload).ConfigureAwait(false);
     }
 

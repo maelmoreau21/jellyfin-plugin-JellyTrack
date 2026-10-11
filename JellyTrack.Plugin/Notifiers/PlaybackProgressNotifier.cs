@@ -7,7 +7,6 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 
 namespace JellyTrack.Plugin.Notifiers;
 
@@ -159,7 +158,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
                     IpAddress = e.Session.RemoteEndPoint,
                     PositionTicks = e.Session.PlayState?.PositionTicks ?? 0,
                     IsPaused = e.Session.PlayState?.IsPaused,
-                    PlaybackRate = TryGetPlaybackRate(e.Session),
+                    PlaybackRate = null,
                 },
                 PositionTicks = positionTicks,
                 IsPaused = isPaused,
@@ -188,7 +187,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             IpAddress = session.RemoteEndPoint,
             PositionTicks = session.PlayState?.PositionTicks ?? 0,
             IsPaused = session.PlayState?.IsPaused,
-            PlaybackRate = TryGetPlaybackRate(session),
+            PlaybackRate = null,
         };
 
         if (session.TranscodingInfo is not null)
@@ -232,73 +231,6 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
         }
 
         return sessionInfo;
-    }
-
-    private static double? TryGetPlaybackRate(MediaBrowser.Controller.Session.SessionInfo session)
-    {
-        var candidates = new object?[] { session.PlayState, session };
-        var propertyNames = new[] { "PlaybackRate", "PlaybackSpeed", "PlaySpeed", "Speed", "Rate" };
-
-        foreach (var candidate in candidates)
-        {
-            if (candidate is null)
-            {
-                continue;
-            }
-
-            var type = candidate.GetType();
-            foreach (var propertyName in propertyNames)
-            {
-                var property = type.GetProperty(propertyName);
-                if (property is null)
-                {
-                    continue;
-                }
-
-                var value = property.GetValue(candidate);
-                var parsed = ParsePlaybackRate(value);
-                if (parsed.HasValue)
-                {
-                    return parsed.Value;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private static double? ParsePlaybackRate(object? value)
-    {
-        if (value is null)
-        {
-            return null;
-        }
-
-        double parsed;
-        if (value is string text)
-        {
-            if (!double.TryParse(text.Trim().TrimStart('x', 'X'), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed))
-            {
-                return null;
-            }
-        }
-        else
-        {
-            try
-            {
-                parsed = Convert.ToDouble(value, CultureInfo.InvariantCulture);
-            }
-            catch (InvalidCastException)
-            {
-                return null;
-            }
-            catch (FormatException)
-            {
-                return null;
-            }
-        }
-
-        return parsed >= 0.25d && parsed <= 4d ? parsed : null;
     }
 
     private static string InferCollectionType(BaseItem item)

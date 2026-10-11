@@ -8,7 +8,24 @@ public sealed class PlaybackSessionTelemetryState
     private static readonly TimeSpan StaleSessionThreshold = TimeSpan.FromHours(24);
     private readonly ConcurrentDictionary<string, PlaybackSessionSnapshot> _sessions = new();
 
+    private readonly object _observationLock = new();
+
+    public void InitializeSession(PlaybackProgressObservation observation)
+    {
+        lock (_observationLock)
+        {
+            CleanupStaleSessionsIfNeeded(observation.TimestampUtc);
+            _sessions[observation.SessionId] = PlaybackSessionSnapshot.FromObservation(
+                observation, observation.TimestampUtc, observation.TimestampUtc);
+        }
+    }
+
     public PlaybackProgressDecision ObserveProgress(PlaybackProgressObservation observation)
+    {
+        lock (_observationLock) { return ObserveProgressCore(observation); }
+    }
+
+    private PlaybackProgressDecision ObserveProgressCore(PlaybackProgressObservation observation)
     {
         var now = observation.TimestampUtc;
         CleanupStaleSessionsIfNeeded(now);
@@ -45,8 +62,8 @@ public sealed class PlaybackSessionTelemetryState
                 {
                     var wallDeltaTicks = Math.Max(0, (long)(now - previous.LastSeenUtc).TotalSeconds * 10_000_000L);
                     var tickDelta = observation.PositionTicks - previous.PositionTicks;
-                    var expectedBudget = Math.Max(thresholdTicks, wallDeltaTicks + thresholdTicks);
-                    if (Math.Abs(tickDelta) >= thresholdTicks && Math.Abs(tickDelta) > expectedBudget)
+                    var expectedTicks = previous.IsPaused ? 0 : wallDeltaTicks;
+                    if (Math.Abs(tickDelta - expectedTicks) > thresholdTicks)
                     {
                         changes.Add(new PlaybackStateChange(
                             "seek",
@@ -101,7 +118,7 @@ public sealed class PlaybackSessionTelemetryState
 
     public void CleanupSession(string sessionId)
     {
-        _sessions.TryRemove(sessionId, out _);
+        lock (_observationLock) { _sessions.TryRemove(sessionId, out _); }
     }
 
     private void CleanupStaleSessionsIfNeeded(DateTime now)

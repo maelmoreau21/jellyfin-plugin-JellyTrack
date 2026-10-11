@@ -7,11 +7,11 @@ public sealed class HeartbeatEvent : PluginEvent
     [JsonPropertyName("event")]
     public override string Event => "Heartbeat";
 
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
     [JsonPropertyName("pluginVersion")]
     public string PluginVersion { get; set; } = string.Empty;
-
-    [JsonPropertyName("serverName")]
-    public string ServerName { get; set; } = string.Empty;
 
     [JsonPropertyName("jellyfinVersion")]
     public string JellyfinVersion { get; set; } = string.Empty;

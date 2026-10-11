@@ -6,6 +6,67 @@ namespace JellyTrack.Plugin.Tests;
 public sealed class PlaybackSessionTelemetryStateTests
 {
     [Fact]
+    public void PauseImmediatelyAfterStartIsCaptured()
+    {
+        var state = new PlaybackSessionTelemetryState();
+        var now = DateTime.UtcNow;
+        state.InitializeSession(Observation(timestampUtc: now));
+        var decision = state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(1), isPaused: true));
+        Assert.Equal("pause", Assert.Single(decision.StateChanges).ChangeType);
+    }
+
+    [Fact]
+    public void ResumeAndTrackChangesBypassThrottleWithoutDuplicates()
+    {
+        var state = new PlaybackSessionTelemetryState();
+        var now = DateTime.UtcNow;
+        state.InitializeSession(Observation(timestampUtc: now, isPaused: true, subtitleStreamIndex: -1));
+        var next = Observation(timestampUtc: now.AddSeconds(1), audioStreamIndex: 2, subtitleStreamIndex: 3);
+        var decision = state.ObserveProgress(next);
+        Assert.Equal(new[] { "resume", "audio_change", "subtitle_change" }, decision.StateChanges.Select(x => x.ChangeType));
+        Assert.False(decision.ShouldSendProgress);
+        Assert.Empty(state.ObserveProgress(next).StateChanges);
+    }
+
+    [Fact]
+    public void BackwardSeekAfterLongGapIsDetected()
+    {
+        var state = new PlaybackSessionTelemetryState();
+        var now = DateTime.UtcNow;
+        state.InitializeSession(Observation(timestampUtc: now, positionTicks: 1_000_000_000));
+        var decision = state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(120), positionTicks: 400_000_000));
+        Assert.Equal("backward", Assert.Single(decision.StateChanges).Metadata["direction"]);
+    }
+
+    [Fact]
+    public void ConcurrentDuplicateObservationsProduceOneTransition()
+    {
+        var state = new PlaybackSessionTelemetryState();
+        var now = DateTime.UtcNow;
+        state.InitializeSession(Observation(timestampUtc: now));
+        var changes = new System.Collections.Concurrent.ConcurrentBag<PlaybackStateChange>();
+        Parallel.For(0, 100, _ =>
+        {
+            foreach (var change in state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(1), isPaused: true)).StateChanges)
+                changes.Add(change);
+        });
+        Assert.Equal("pause", Assert.Single(changes).ChangeType);
+    }
+
+    [Fact]
+    public void PlayingAndPausedProgressUseConfiguredCadence()
+    {
+        var state = new PlaybackSessionTelemetryState();
+        var now = DateTime.UtcNow;
+        state.InitializeSession(Observation(timestampUtc: now));
+        Assert.False(state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(4), positionTicks: 40_000_000)).ShouldSendProgress);
+        Assert.True(state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(5), positionTicks: 50_000_000)).ShouldSendProgress);
+        state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(6), positionTicks: 50_000_000, isPaused: true));
+        Assert.False(state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(34), positionTicks: 50_000_000, isPaused: true)).ShouldSendProgress);
+        Assert.True(state.ObserveProgress(Observation(timestampUtc: now.AddSeconds(35), positionTicks: 50_000_000, isPaused: true)).ShouldSendProgress);
+    }
+
+    [Fact]
     public void FirstObservationSendsProgressWithoutTransitions()
     {
         var state = new PlaybackSessionTelemetryState();

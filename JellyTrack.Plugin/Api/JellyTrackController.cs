@@ -101,6 +101,7 @@ public class JellyTrackController : ControllerBase
         var testEvent = new HeartbeatEvent
         {
             PluginVersion = Plugin.Instance?.Version.ToString() ?? "0.0.0.0",
+            ServerId = _applicationHost.SystemId,
             ServerName = _applicationHost.FriendlyName,
             JellyfinVersion = _applicationHost.ApplicationVersionString,
             Users = new List<HeartbeatUser>(),
@@ -185,6 +186,7 @@ public class JellyTrackController : ControllerBase
         return new HeartbeatEvent
         {
             PluginVersion = Plugin.Instance?.Version.ToString() ?? "0.0.0.0",
+            ServerId = _applicationHost.SystemId,
             ServerName = _applicationHost.FriendlyName,
             JellyfinVersion = _applicationHost.ApplicationVersionString,
             Users = UserSnapshotResolver.ResolveHeartbeatUsers(_userManager, _logger),

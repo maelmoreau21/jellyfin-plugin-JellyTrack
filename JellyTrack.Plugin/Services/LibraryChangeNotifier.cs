@@ -24,6 +24,21 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
     private readonly object _timerLock = new();
     private const int DebounceSeconds = 30;
     private const int MaxPendingItems = 1000;
+    private int _flushing;
+    private bool _stopped;
+
+    internal int PendingItemCount => _pendingItems.Count;
+
+    internal bool TryAddPendingItem(BaseItem item)
+    {
+        lock (_timerLock)
+        {
+            if (_stopped) return false;
+            if (_pendingItems.ContainsKey(item.Id)) return true;
+            if (_pendingItems.Count >= MaxPendingItems) return false;
+            return _pendingItems.TryAdd(item.Id, item);
+        }
+    }
 
     public LibraryChangeNotifier(
         ILibraryManager libraryManager,
@@ -39,6 +54,7 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        lock (_timerLock) { _stopped = false; }
         _libraryManager.ItemAdded += OnItemChanged;
         _libraryManager.ItemUpdated += OnItemChanged;
         _logger.LogInformation("JellyTrack LibraryChangeNotifier started");
@@ -49,7 +65,7 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
     {
         _libraryManager.ItemAdded -= OnItemChanged;
         _libraryManager.ItemUpdated -= OnItemChanged;
-        _debounceTimer?.Dispose();
+        Dispose();
         _logger.LogInformation("JellyTrack LibraryChangeNotifier stopped");
         return Task.CompletedTask;
     }
@@ -70,33 +86,42 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
             return;
         }
 
-        _pendingItems.TryAdd(item.Id, item);
-
-        if (_pendingItems.Count >= MaxPendingItems)
-        {
-            lock (_timerLock)
-            {
-                _debounceTimer?.Dispose();
-                _debounceTimer = null;
-            }
-
-            _ = FlushPendingItemsAsync();
-            return;
-        }
+        if (!TryAddPendingItem(item)) return;
 
         // Reset the debounce timer
         lock (_timerLock)
         {
-            _debounceTimer?.Dispose();
-            _debounceTimer = new Timer(
-                _ => _ = FlushPendingItemsAsync(),
-                null,
-                TimeSpan.FromSeconds(DebounceSeconds),
-                Timeout.InfiniteTimeSpan);
+            if (_stopped) return;
+            _debounceTimer ??= new Timer(_ => _ = Task.Run(FlushPendingItemsAsync), null,
+                Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _debounceTimer.Change(_pendingItems.Count >= MaxPendingItems
+                ? TimeSpan.Zero : TimeSpan.FromSeconds(DebounceSeconds), Timeout.InfiniteTimeSpan);
         }
     }
 
     private async Task FlushPendingItemsAsync()
+    {
+        if (Interlocked.Exchange(ref _flushing, 1) != 0) return;
+        try
+        {
+            await FlushPendingItemsCoreAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Library notification enrichment failed");
+        }
+        finally
+        {
+            Volatile.Write(ref _flushing, 0);
+            lock (_timerLock)
+            {
+                if (!_pendingItems.IsEmpty)
+                    _debounceTimer?.Change(TimeSpan.FromSeconds(DebounceSeconds), Timeout.InfiniteTimeSpan);
+            }
+        }
+    }
+
+    private async Task FlushPendingItemsCoreAsync()
     {
         if (_pendingItems.IsEmpty)
         {
@@ -105,11 +130,12 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
 
         // Drain all pending items
         var items = new List<BaseItem>();
-        foreach (var key in _pendingItems.Keys.ToList())
+        lock (_timerLock)
         {
-            if (_pendingItems.TryRemove(key, out var item))
+            if (_stopped) return;
+            foreach (var key in _pendingItems.Keys.ToList())
             {
-                items.Add(item);
+                if (_pendingItems.TryRemove(key, out var item)) items.Add(item);
             }
         }
 
@@ -218,6 +244,11 @@ public class LibraryChangeNotifier : IHostedService, IDisposable
 
     public void Dispose()
     {
-        _debounceTimer?.Dispose();
+        lock (_timerLock)
+        {
+            _stopped = true;
+            _debounceTimer?.Dispose();
+            _debounceTimer = null;
+        }
     }
 }

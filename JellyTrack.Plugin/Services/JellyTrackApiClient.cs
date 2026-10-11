@@ -1,4 +1,5 @@
-using System.Collections.Concurrent;
+using Microsoft.Extensions.Hosting;
+using MediaBrowser.Controller;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -11,7 +12,7 @@ namespace JellyTrack.Plugin.Services;
 public sealed record TestConnectionResult(bool Success, HttpStatusCode? StatusCode, string Message, string Endpoint);
 public sealed record PluginRuntimeMetricsSnapshot(int QueueDepth, int RetryAttempts, int? LastHttpCode, int CoalescedProgressEvents);
 
-public class JellyTrackApiClient : IDisposable
+public class JellyTrackApiClient : BackgroundService
 {
     public const int MaxResponseBodyChars = 4096;
     private const string DefaultPluginEventsPath = "/api/plugin/events";
@@ -19,8 +20,14 @@ public class JellyTrackApiClient : IDisposable
     private readonly HttpClient _httpClient;
     private readonly ILogger<JellyTrackApiClient> _logger;
     private readonly bool _ownsClient;
-    private readonly ConcurrentQueue<QueuedPluginEvent> _retryQueue = new();
-    private readonly ConcurrentDictionary<string, PluginEvent> _coalescedProgressEvents = new();
+    private readonly LinkedList<PluginEvent> _deliveryQueue = new();
+    private readonly object _queueLock = new();
+    private readonly SemaphoreSlim _queueSignal = new(0, 1);
+    private readonly Func<PluginConfiguration?> _configuration;
+    private readonly string? _serverId;
+    private readonly string? _serverName;
+    private PluginEvent? _inFlight;
+    internal TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(10);
     private int _retryAttempts;
     private int _coalescedProgressEventsCount;
     private int? _lastHttpCode;
@@ -32,16 +39,19 @@ public class JellyTrackApiClient : IDisposable
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public JellyTrackApiClient(IHttpClientFactory httpClientFactory, ILogger<JellyTrackApiClient> logger)
-        : this(CreateSafeHttpClient(), logger, ownsClient: true)
+    public JellyTrackApiClient(IHttpClientFactory httpClientFactory, ILogger<JellyTrackApiClient> logger, IServerApplicationHost applicationHost)
+        : this(CreateSafeHttpClient(), logger, ownsClient: true, serverId: applicationHost.SystemId, serverName: applicationHost.FriendlyName)
     {
     }
 
-    internal JellyTrackApiClient(HttpClient httpClient, ILogger<JellyTrackApiClient> logger, bool ownsClient = false)
+    internal JellyTrackApiClient(HttpClient httpClient, ILogger<JellyTrackApiClient> logger, bool ownsClient = false, Func<PluginConfiguration?>? configuration = null, string? serverId = null, string? serverName = null)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _ownsClient = ownsClient;
+        _configuration = configuration ?? (() => Plugin.Instance?.Configuration);
+        _serverId = serverId;
+        _serverName = serverName;
     }
 
     private static HttpClient CreateSafeHttpClient()
@@ -59,33 +69,104 @@ public class JellyTrackApiClient : IDisposable
         };
     }
 
-    public async Task<bool> SendEventAsync(PluginEvent eventPayload, CancellationToken cancellationToken = default)
+    // The result means accepted into the bounded queue, not delivered over HTTP.
+    public Task<bool> SendEventAsync(PluginEvent eventPayload, CancellationToken cancellationToken = default)
     {
-        var config = Plugin.Instance?.Configuration;
-        if (config is null || !config.Enabled)
+        var config = _configuration();
+        if (cancellationToken.IsCancellationRequested || config is null || !config.Enabled
+            || string.IsNullOrWhiteSpace(config.ApiKey) || !TryResolveEndpoint(config.JellyTrackUrl, out _))
         {
-            return false;
+            return Task.FromResult(false);
         }
 
-        var configuredUrl = config.JellyTrackUrl?.Trim() ?? string.Empty;
-        var apiKey = config.ApiKey?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(configuredUrl) || string.IsNullOrWhiteSpace(apiKey))
+        eventPayload.ServerId ??= _serverId;
+        eventPayload.ServerName ??= _serverName;
+        lock (_queueLock)
         {
-            _logger.LogWarning("JellyTrack URL or API key is not configured");
-            return false;
+            // Only replace adjacent progress observations. Never move progress across
+            // pause/seek/stop/start boundaries, including a reused Jellyfin session ID.
+            if (eventPayload is PlaybackProgressEvent progress
+                && _deliveryQueue.Last?.Value is PlaybackProgressEvent previous
+                && progress.SessionId == previous.SessionId && progress.Media.JellyfinMediaId == previous.Media.JellyfinMediaId)
+            {
+                _deliveryQueue.Last.Value = eventPayload;
+                Interlocked.Increment(ref _coalescedProgressEventsCount);
+            }
+            else
+            {
+                while (_deliveryQueue.Count + (_inFlight is null ? 0 : 1) >= config.RetryQueueSize)
+                {
+                    var disposable = _deliveryQueue.First;
+                    while (disposable is not null && disposable.Value is not PlaybackProgressEvent)
+                    {
+                        disposable = disposable.Next;
+                    }
+                    _deliveryQueue.Remove(disposable ?? _deliveryQueue.First!);
+                    _logger.LogWarning("JellyTrack delivery queue full; oldest pending event dropped");
+                }
+                _deliveryQueue.AddLast(eventPayload);
+            }
         }
-
-        if (!TryResolveEndpoint(configuredUrl, out var endpoint))
+        if (_queueSignal.CurrentCount == 0)
         {
-            _logger.LogWarning("Invalid JellyTrack URL configured: {Url}", configuredUrl);
-            return false;
+            try { _queueSignal.Release(); } catch (SemaphoreFullException) { }
         }
+        return Task.FromResult(true);
+    }
 
-        // Attempt to flush queued events first
-        await FlushRetryQueueAsync(endpoint, apiKey, cancellationToken).ConfigureAwait(false);
-
-        return await SendSingleEventAsync(endpoint, apiKey, eventPayload, cancellationToken).ConfigureAwait(false);
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await _queueSignal.WaitAsync(stoppingToken).ConfigureAwait(false);
+                var deliveredInBatch = 0;
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    var config = _configuration();
+                    if (config is null || !config.Enabled || string.IsNullOrWhiteSpace(config.ApiKey)
+                        || !TryResolveEndpoint(config.JellyTrackUrl, out var endpoint))
+                    {
+                        await Task.Delay(RetryDelay, stoppingToken).ConfigureAwait(false);
+                        continue;
+                    }
+                    lock (_queueLock)
+                    {
+                        if (_inFlight is null && _deliveryQueue.First is { } first)
+                        {
+                            _inFlight = first.Value;
+                            _deliveryQueue.RemoveFirst();
+                        }
+                    }
+                    if (_inFlight is null) break;
+                    var sent = await SendSingleEventAsync(endpoint, config.ApiKey, _inFlight, stoppingToken).ConfigureAwait(false);
+                    if (sent)
+                    {
+                        lock (_queueLock) { _inFlight = null; }
+                        if (++deliveredInBatch >= config.RetryFlushBatchSize)
+                        {
+                            deliveredInBatch = 0;
+                            await Task.Delay(TimeSpan.FromMilliseconds(100), stoppingToken).ConfigureAwait(false);
+                        }
+                    }
+                    else
+                    {
+                        // Keep the failed event ahead of later lifecycle events.
+                        Interlocked.Increment(ref _retryAttempts);
+                        await Task.Delay(RetryDelay, stoppingToken).ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "JellyTrack delivery worker failed; retrying");
+                try { await Task.Delay(RetryDelay, stoppingToken).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
+                if (_queueSignal.CurrentCount == 0) _queueSignal.Release();
+            }
+        }
     }
 
     public async Task<TestConnectionResult> TestConnectionAsync(
@@ -109,9 +190,13 @@ public class JellyTrackApiClient : IDisposable
 
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            cancellationToken = timeout.Token;
             using var request = BuildAuthenticatedRequest(endpoint, normalizedApiKey, eventPayload);
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            var responseBody = await ReadResponseBodyAsync(response).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            var responseBody = (await ReadResponseBodyAsync(response, cancellationToken).ConfigureAwait(false))
+                .Replace(normalizedApiKey, "[redacted]", StringComparison.Ordinal);
 
             if (response.IsSuccessStatusCode)
             {
@@ -124,7 +209,7 @@ public class JellyTrackApiClient : IDisposable
             _logger.LogWarning(
                 "JellyTrack test connection failed with {StatusCode}. Response: {Response}",
                 (int)response.StatusCode,
-                responseBody);
+                responseBody.Replace(normalizedApiKey, "[redacted]", StringComparison.Ordinal));
 
             var failureMessage = string.IsNullOrWhiteSpace(responseBody)
                 ? $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}"
@@ -157,7 +242,7 @@ public class JellyTrackApiClient : IDisposable
         }
 
         return new PluginRuntimeMetricsSnapshot(
-            QueueDepth: _retryQueue.Count,
+            QueueDepth: GetQueueDepth(),
             RetryAttempts: Volatile.Read(ref _retryAttempts),
             LastHttpCode: lastHttpCode,
             CoalescedProgressEvents: Volatile.Read(ref _coalescedProgressEventsCount));
@@ -167,9 +252,12 @@ public class JellyTrackApiClient : IDisposable
     {
         try
         {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            cancellationToken = timeout.Token;
             using var request = BuildAuthenticatedRequest(endpoint, apiKey, eventPayload);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             lock (_telemetryLock)
             {
                 _lastHttpCode = (int)response.StatusCode;
@@ -188,125 +276,47 @@ public class JellyTrackApiClient : IDisposable
                 return true;
             }
 
-            var responseBody = await ReadResponseBodyAsync(response).ConfigureAwait(false);
+            var responseBody = await ReadResponseBodyAsync(response, cancellationToken).ConfigureAwait(false);
             _logger.LogWarning(
                 "JellyTrack API returned {StatusCode} for event {Event}. Response: {Response}",
                 response.StatusCode,
                 eventPayload.Event,
-                responseBody);
-            EnqueueForRetry(eventPayload);
+                responseBody.Replace(apiKey, "[redacted]", StringComparison.Ordinal));
+            // Invalid payloads cannot heal on retry; authentication may heal after key rotation.
+            var code = (int)response.StatusCode;
+            if (code is >= 400 and < 500 && code is not (401 or 403 or 408 or 429))
+            {
+                _logger.LogWarning("Discarding rejected JellyTrack event {Event} (HTTP {Code})", eventPayload.Event, code);
+                return true;
+            }
             return false;
         }
         catch (TaskCanceledException)
         {
             _logger.LogWarning("JellyTrack API request timed out for event {Event}", eventPayload.Event);
-            EnqueueForRetry(eventPayload);
             return false;
         }
         catch (HttpRequestException ex)
         {
             _logger.LogWarning(ex, "Failed to send event {Event} to JellyTrack", eventPayload.Event);
-            EnqueueForRetry(eventPayload);
             return false;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error sending event {Event} to JellyTrack", eventPayload.Event);
-            EnqueueForRetry(eventPayload);
             return false;
         }
     }
 
-    private void EnqueueForRetry(PluginEvent eventPayload)
+    private int GetQueueDepth()
     {
-        var maxQueueSize = Plugin.Instance?.Configuration.RetryQueueSize ?? PluginConfiguration.DefaultRetryQueueSize;
-        maxQueueSize = Math.Max(10, maxQueueSize);
-
-        var coalesceKey = GetCoalesceKey(eventPayload);
-        if (coalesceKey is not null)
-        {
-            if (_coalescedProgressEvents.TryAdd(coalesceKey, eventPayload))
-            {
-                _retryQueue.Enqueue(new QueuedPluginEvent(coalesceKey, eventPayload));
-            }
-            else
-            {
-                _coalescedProgressEvents[coalesceKey] = eventPayload;
-                Interlocked.Increment(ref _coalescedProgressEventsCount);
-                return;
-            }
-        }
-        else
-        {
-            _retryQueue.Enqueue(new QueuedPluginEvent(null, eventPayload));
-        }
-
-        while (_retryQueue.Count > maxQueueSize && _retryQueue.TryDequeue(out var dropped))
-        {
-            if (dropped.CoalesceKey is not null)
-            {
-                _coalescedProgressEvents.TryRemove(dropped.CoalesceKey, out _);
-            }
-        }
-    }
-
-    private async Task FlushRetryQueueAsync(Uri endpoint, string apiKey, CancellationToken cancellationToken)
-    {
-        var flushBatchSize = Plugin.Instance?.Configuration.RetryFlushBatchSize ?? PluginConfiguration.DefaultRetryFlushBatchSize;
-        var count = Math.Min(_retryQueue.Count, Math.Max(1, flushBatchSize));
-        for (int i = 0; i < count; i++)
-        {
-            if (!_retryQueue.TryDequeue(out var queued))
-            {
-                break;
-            }
-
-            var eventToSend = queued.EventPayload;
-            if (queued.CoalesceKey is not null
-                && !_coalescedProgressEvents.TryRemove(queued.CoalesceKey, out eventToSend))
-            {
-                continue;
-            }
-
-            try
-            {
-                Interlocked.Increment(ref _retryAttempts);
-                using var request = BuildAuthenticatedRequest(endpoint, apiKey, eventToSend);
-
-                using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-                lock (_telemetryLock)
-                {
-                    _lastHttpCode = (int)response.StatusCode;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogDebug("Retry failed for queued event {Event}, re-queuing", eventToSend.Event);
-                    EnqueueForRetry(eventToSend);
-                    break; // stop flushing if server is still down
-                }
-            }
-            catch (Exception)
-            {
-                EnqueueForRetry(eventToSend);
-                break;
-            }
-        }
-    }
-
-    private static string? GetCoalesceKey(PluginEvent eventPayload)
-    {
-        if (eventPayload is PlaybackProgressEvent progress
-            && !string.IsNullOrWhiteSpace(progress.SessionId))
-        {
-            return $"PlaybackProgress:{progress.SessionId}";
-        }
-
-        return null;
+        lock (_queueLock) { return _deliveryQueue.Count + (_inFlight is null ? 0 : 1); }
     }
 
     private HttpRequestMessage BuildAuthenticatedRequest(Uri endpoint, string apiKey, PluginEvent eventPayload)
     {
+        eventPayload.ServerId ??= _serverId;
+        eventPayload.ServerName ??= _serverName;
         var normalizedApiKey = apiKey.Trim();
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", normalizedApiKey);
@@ -457,14 +467,14 @@ public class JellyTrackApiClient : IDisposable
         return "/" + trimmed;
     }
 
-    internal static async Task<string> ReadResponseBodyAsync(HttpResponseMessage response)
+    internal static async Task<string> ReadResponseBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken = default)
     {
         try
         {
-            using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using var reader = new StreamReader(stream, Encoding.UTF8);
             var buffer = new char[MaxResponseBodyChars];
-            var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length).ConfigureAwait(false);
+            var charsRead = await reader.ReadBlockAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
             if (charsRead <= 0) return string.Empty;
 
             var sb = new StringBuilder(charsRead);
@@ -484,13 +494,14 @@ public class JellyTrackApiClient : IDisposable
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         if (_ownsClient)
         {
             _httpClient.Dispose();
         }
     }
 
-    private sealed record QueuedPluginEvent(string? CoalesceKey, PluginEvent EventPayload);
+
 }

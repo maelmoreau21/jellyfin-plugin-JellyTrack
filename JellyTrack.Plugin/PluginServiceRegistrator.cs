@@ -15,6 +15,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<JellyTrackApiClient>();
+        serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<JellyTrackApiClient>());
         serviceCollection.AddSingleton<PlaybackMediaStreamCache>();
         serviceCollection.AddSingleton<PlaybackSessionTelemetryState>();
         serviceCollection.AddSingleton<HeartbeatService>();

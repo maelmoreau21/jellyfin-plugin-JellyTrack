@@ -156,14 +156,14 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
             if (success)
             {
                 _logger.LogInformation(
-                    "JellyTrack heartbeat sent ({Source}) with {UserCount} users",
+                    "JellyTrack heartbeat queued ({Source}) with {UserCount} users",
                     source,
                     users.Count);
             }
             else
             {
                 _logger.LogWarning(
-                    "JellyTrack heartbeat failed ({Source}). Verify URL/API key/network reachability from Jellyfin host.",
+                    "JellyTrack heartbeat could not be queued ({Source}). Verify URL/API key/network reachability from Jellyfin host.",
                     source);
             }
         }
@@ -242,59 +242,13 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
 
     private void TryPersistConfigurationMigration(Plugin plugin, PluginConfiguration config)
     {
-        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
-
         try
         {
-            var updateMethod = plugin
-                .GetType()
-                .GetMethods(Flags)
-                .FirstOrDefault(method =>
-                {
-                    if (!string.Equals(method.Name, "UpdateConfiguration", StringComparison.Ordinal))
-                    {
-                        return false;
-                    }
-
-                    var parameters = method.GetParameters();
-                    return parameters.Length == 1 &&
-                           parameters[0].ParameterType.IsAssignableFrom(typeof(PluginConfiguration));
-                });
-
-            if (updateMethod is not null)
-            {
-                updateMethod.Invoke(plugin, new object[] { config });
-                _logger.LogInformation(
-                    "Persisted migrated heartbeat interval: {DefaultSeconds}s.",
-                    config.HeartbeatIntervalSeconds);
-                return;
-            }
-
-            var saveMethod = plugin
-                .GetType()
-                .GetMethods(Flags)
-                .FirstOrDefault(method =>
-                    string.Equals(method.Name, "SaveConfiguration", StringComparison.Ordinal) &&
-                    method.GetParameters().Length == 0);
-
-            if (saveMethod is not null)
-            {
-                saveMethod.Invoke(plugin, null);
-                _logger.LogInformation(
-                    "Persisted migrated heartbeat interval: {DefaultSeconds}s.",
-                    config.HeartbeatIntervalSeconds);
-                return;
-            }
-
-            _logger.LogWarning(
-                "Heartbeat interval migration applied in memory ({DefaultSeconds}s), but no persistence method was found.",
-                config.HeartbeatIntervalSeconds);
+            plugin.UpdateConfiguration(config);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(
-                ex,
-                "Heartbeat interval migration applied in memory but persistence failed.");
+            _logger.LogWarning(ex, "Heartbeat interval migration applied in memory but persistence failed.");
         }
     }
 
@@ -316,21 +270,8 @@ public class HeartbeatService : IScheduledTask, IHostedService, IDisposable
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        var intervalSeconds = GetHeartbeatIntervalSeconds();
-
-        return new[]
-        {
-            new TaskTriggerInfo
-            {
-                // Use enum values from MediaBrowser.Model.Tasks.TaskTriggerInfoType (IntervalTrigger, StartupTrigger)
-                Type = TaskTriggerInfoType.IntervalTrigger,
-                IntervalTicks = TimeSpan.FromSeconds(intervalSeconds).Ticks
-            },
-            new TaskTriggerInfo
-            {
-                Type = TaskTriggerInfoType.StartupTrigger
-            }
-        };
+        // The hosted loop owns periodic/startup delivery. Keep manual execution available.
+        return Array.Empty<TaskTriggerInfo>();
     }
 
     public void Dispose()
