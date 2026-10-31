@@ -46,7 +46,7 @@ public class PlaybackProgressNotifier : IEventConsumer<PlaybackProgressEventArgs
             return;
         }
 
-        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session);
+        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session, e.Users);
         if (string.IsNullOrWhiteSpace(jellyfinUserId))
         {
             _logger.LogWarning("PlaybackProgress ignored: could not resolve user for session {SessionId}", e.Session.Id);

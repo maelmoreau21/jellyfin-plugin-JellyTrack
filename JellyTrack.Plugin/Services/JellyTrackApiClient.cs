@@ -32,6 +32,31 @@ public class JellyTrackApiClient : BackgroundService
     private int _coalescedProgressEventsCount;
     private int? _lastHttpCode;
     private readonly object _telemetryLock = new();
+    private readonly object _workerStartLock = new();
+    private Task? _workerLoopTask;
+    private CancellationTokenSource? _workerCts;
+
+    public void EnsureWorkerStarted()
+    {
+        if (_workerLoopTask is not null && !_workerLoopTask.IsCompleted)
+        {
+            return;
+        }
+
+        lock (_workerStartLock)
+        {
+            if (_workerLoopTask is null || _workerLoopTask.IsCompleted)
+            {
+                _workerCts ??= new CancellationTokenSource();
+                _workerLoopTask = Task.Run(() => ExecuteAsync(_workerCts.Token));
+            }
+        }
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        return base.StartAsync(cancellationToken);
+    }
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

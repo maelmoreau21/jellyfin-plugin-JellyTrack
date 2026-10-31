@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/maelmoreau21/jellyfin-plugin-JellyTrack/main/assets/banner.png",
         "versions": [
             {
+                "version": "2.2.0.0",
+                "changelog": "## v2.2.0.0\n- Support Jellyfin 12 and all future 12.x updates with targetAbi 12.0.0.0 and .NET 10.\n- Direct ISessionManager event listener integration to reliably capture PlaybackStart, PlaybackProgress, PlaybackStopped, and SessionEnded events.\n- Robust user resolution fallback supporting e.Users and session.AdditionalUsers when session.UserId is empty.\n- Updated Jellyfin.Controller and Jellyfin.Model packages to 12.4.0.\n",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/maelmoreau21/jellyfin-plugin-JellyTrack/releases/download/v2.2.0.0/Jellyfin.Plugin.JellyTrack-2.2.0.0.zip",
+                "checksum": "b692e558e0a15c9d9da3e8c98bc5e716",
+                "timestamp": "2026-10-31T07:26:50Z"
+            },
+            {
                 "version": "2.1.0.0",
                 "changelog": "## v2.1.0.0 (unreleased)\n- Target .NET 10 and stable Jellyfin 12.2 APIs only (targetAbi 12.2.0.0).\n- Deliver events in a bounded background queue without waiting for HTTP in Jellyfin callbacks.\n- Preserve delivery order on reconnect and merge only adjacent progress observations.\n- Include the Jellyfin SystemId for scoped JellyTrack Go plugin keys.\n- Remove duplicate periodic heartbeat triggers and legacy reflection fallbacks.\n- Real Jellyfin server validation is still required before publication.\n",
                 "targetAbi": "12.2.0.0",

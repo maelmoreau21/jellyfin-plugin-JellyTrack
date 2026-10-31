@@ -1,14 +1,14 @@
 {
   "category": "General",
-  "changelog": "Jellyfin 12 only, stable 12.2 APIs and .NET 10; bounded background event delivery and explicit server identity for JellyTrack Go. Runtime server validation pending.",
+  "changelog": "Target Jellyfin 12 (.NET 10), dual ISessionManager / IEventConsumer event pipeline, and multi-user resolution fallback.",
   "description": "JellyTrack is an analytics dashboard for Jellyfin. This plugin intercepts playback events, library changes and sends a periodic heartbeat to the JellyTrack server.",
   "guid": "e5a2f2ed-7c2a-4a9f-b1d3-5e6f7a8b9c0d",
   "name": "JellyTrack",
   "overview": "Jellyfin plugin to push playback events to JellyTrack",
   "owner": "JellyTrack",
-  "targetAbi": "12.2.0.0",
-  "timestamp": "2026-10-11T00:00:00Z",
-  "version": "2.1.0.0",
+  "targetAbi": "12.0.0.0",
+  "timestamp": "2026-10-31T08:00:00Z",
+  "version": "2.2.0.0",
   "imagePath": "Jellyfin.Plugin.JellyTrack.png",
   "assemblies": [
     "Jellyfin.Plugin.JellyTrack.dll"

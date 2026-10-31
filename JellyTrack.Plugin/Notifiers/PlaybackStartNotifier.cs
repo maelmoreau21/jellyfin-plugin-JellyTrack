@@ -18,6 +18,8 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
     private readonly PlaybackMediaStreamCache _streamCache;
     private readonly PlaybackSessionTelemetryState _telemetryState;
     private readonly ILogger<PlaybackStartNotifier> _logger;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (Guid ItemId, DateTime Timestamp)> _recentStarts = new();
+
 
     public PlaybackStartNotifier(
         JellyTrackApiClient apiClient,
@@ -49,7 +51,7 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
             return;
         }
 
-        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session);
+        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session, e.Users);
         if (string.IsNullOrWhiteSpace(jellyfinUserId))
         {
             _logger.LogWarning("PlaybackStart ignored: could not resolve user for session {SessionId}", e.Session.Id);
@@ -60,6 +62,21 @@ public class PlaybackStartNotifier : IEventConsumer<PlaybackStartEventArgs>
         var session = e.Session;
 
         _logger.LogInformation("PlaybackStart captured: user={UserId}, item={ItemId}, session={SessionId}", jellyfinUserId, item.Id, session.Id);
+        var now = DateTime.UtcNow;
+        if (_recentStarts.TryGetValue(session.Id, out var recent) && recent.ItemId == item.Id && (now - recent.Timestamp).TotalSeconds < 2)
+        {
+            return;
+        }
+        _recentStarts[session.Id] = (item.Id, now);
+        if (_recentStarts.Count > 100)
+        {
+            foreach (var kvp in _recentStarts)
+            {
+                if ((now - kvp.Value.Timestamp).TotalSeconds > 10)
+                    _recentStarts.TryRemove(kvp.Key, out _);
+            }
+        }
+
 
         PlaybackStartEvent payload;
         try

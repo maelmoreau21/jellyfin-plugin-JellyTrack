@@ -34,16 +34,66 @@ public static class UserSnapshotResolver
         return users;
     }
 
-    public static (string? JellyfinUserId, string? Username) ResolveUserFromSession(SessionInfo? session)
+    public static (string? JellyfinUserId, string? Username) ResolveUserFromSession(
+        SessionInfo? session,
+        IEnumerable<object>? users = null)
     {
         if (session is null)
         {
+            if (users is not null)
+            {
+                foreach (var u in users)
+                {
+                    if (u is null) continue;
+                    var idProp = u.GetType().GetProperty("Id");
+                    var nameProp = u.GetType().GetProperty("Username");
+                    if (idProp?.GetValue(u) is Guid g && g != Guid.Empty)
+                    {
+                        var name = nameProp?.GetValue(u) as string;
+                        return (g.ToString("D"), name);
+                    }
+                }
+            }
             return (null, null);
         }
 
-        var userId = session.UserId == Guid.Empty ? null : session.UserId.ToString("D");
-        var username = session.UserName ?? session.DeviceName;
+        var userId = session.UserId;
+        var username = session.UserName;
 
-        return (userId, username);
+        if (userId == Guid.Empty && session.AdditionalUsers is { Count: > 0 })
+        {
+            foreach (var add in session.AdditionalUsers)
+            {
+                if (add.UserId != Guid.Empty)
+                {
+                    userId = add.UserId;
+                    username ??= add.UserName;
+                    break;
+                }
+            }
+        }
+
+        if (userId == Guid.Empty && users is not null)
+        {
+            foreach (var u in users)
+            {
+                if (u is null) continue;
+                var idProp = u.GetType().GetProperty("Id");
+                var nameProp = u.GetType().GetProperty("Username");
+                if (idProp?.GetValue(u) is Guid g && g != Guid.Empty)
+                {
+                    userId = g;
+                    username ??= nameProp?.GetValue(u) as string;
+                    break;
+                }
+            }
+        }
+
+        if (userId == Guid.Empty)
+        {
+            return (null, username ?? session.DeviceName);
+        }
+
+        return (userId.ToString("D"), username ?? session.DeviceName ?? "Unknown");
     }
 }

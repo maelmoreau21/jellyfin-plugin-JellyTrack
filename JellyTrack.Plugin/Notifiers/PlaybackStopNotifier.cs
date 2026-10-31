@@ -11,6 +11,8 @@ public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
     private readonly JellyTrackApiClient _apiClient;
     private readonly PlaybackSessionTelemetryState _telemetryState;
     private readonly ILogger<PlaybackStopNotifier> _logger;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _recentStops = new();
+
 
     public PlaybackStopNotifier(
         JellyTrackApiClient apiClient,
@@ -36,7 +38,7 @@ public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
             return;
         }
 
-        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session);
+        var (jellyfinUserId, username) = UserSnapshotResolver.ResolveUserFromSession(e.Session, e.Users);
         if (string.IsNullOrWhiteSpace(jellyfinUserId))
         {
             _logger.LogWarning("PlaybackStop ignored: could not resolve user for session {SessionId}", e.Session.Id);
@@ -46,6 +48,21 @@ public class PlaybackStopNotifier : IEventConsumer<PlaybackStopEventArgs>
         var item = e.Item;
 
         _logger.LogInformation("PlaybackStop captured: user={UserId}, item={ItemId}, session={SessionId}", jellyfinUserId, item.Id, e.Session.Id);
+        var now = DateTime.UtcNow;
+        if (_recentStops.TryGetValue(e.Session.Id, out var recentStop) && (now - recentStop).TotalSeconds < 2)
+        {
+            return;
+        }
+        _recentStops[e.Session.Id] = now;
+        if (_recentStops.Count > 100)
+        {
+            foreach (var kvp in _recentStops)
+            {
+                if ((now - kvp.Value).TotalSeconds > 10)
+                    _recentStops.TryRemove(kvp.Key, out _);
+            }
+        }
+
         _telemetryState.CleanupSession(e.Session.Id);
 
         var payload = new PlaybackStopEvent

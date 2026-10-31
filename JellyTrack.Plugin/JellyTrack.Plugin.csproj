@@ -4,14 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>JellyTrack.Plugin</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.JellyTrack</AssemblyName>
-    <Version>2.1.0.0</Version>
-    <AssemblyVersion>2.1.0.0</AssemblyVersion>
-    <FileVersion>2.1.0.0</FileVersion>
-    <InformationalVersion>2.1.0.0</InformationalVersion>
+    <Version>2.2.0.0</Version>
+    <AssemblyVersion>2.2.0.0</AssemblyVersion>
+    <FileVersion>2.2.0.0</FileVersion>
+    <InformationalVersion>2.2.0.0</InformationalVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <JellyfinPackageVersion>12.2.0</JellyfinPackageVersion>
+    <JellyfinPackageVersion>12.4.0</JellyfinPackageVersion>
     <WarningsAsErrors>$(WarningsAsErrors);CS0618</WarningsAsErrors>
   </PropertyGroup>
 
@@ -37,6 +37,6 @@
 
   <Target Name="ValidateSupportedFramework" BeforeTargets="CollectPackageReferences;PrepareForBuild"
           Condition="'$(TargetFramework)' != 'net10.0'">
-    <Error Text="JellyTrack requires net10.0 and Jellyfin 12.2 or later compatible versions." />
+    <Error Text="JellyTrack requires net10.0 and Jellyfin 12.4 or later compatible versions." />
   </Target>
 </Project>

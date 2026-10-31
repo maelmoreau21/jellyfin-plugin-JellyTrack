@@ -21,11 +21,20 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<HeartbeatService>();
         serviceCollection.AddSingleton<IScheduledTask>(sp => sp.GetRequiredService<HeartbeatService>());
         serviceCollection.AddSingleton<IHostedService>(sp => sp.GetRequiredService<HeartbeatService>());
+
+        serviceCollection.AddSingleton<PlaybackStartNotifier>();
+        serviceCollection.AddSingleton<IEventConsumer<PlaybackStartEventArgs>>(sp => sp.GetRequiredService<PlaybackStartNotifier>());
+
         serviceCollection.AddSingleton<PlaybackProgressNotifier>();
-        serviceCollection.AddSingleton<IEventConsumer<PlaybackStartEventArgs>, PlaybackStartNotifier>();
-        serviceCollection.AddSingleton<IEventConsumer<PlaybackStopEventArgs>, PlaybackStopNotifier>();
         serviceCollection.AddSingleton<IEventConsumer<PlaybackProgressEventArgs>>(sp => sp.GetRequiredService<PlaybackProgressNotifier>());
-        serviceCollection.AddSingleton<IEventConsumer<MediaBrowser.Controller.Events.Session.SessionEndedEventArgs>, SessionEndedNotifier>();
+
+        serviceCollection.AddSingleton<PlaybackStopNotifier>();
+        serviceCollection.AddSingleton<IEventConsumer<PlaybackStopEventArgs>>(sp => sp.GetRequiredService<PlaybackStopNotifier>());
+
+        serviceCollection.AddSingleton<SessionEndedNotifier>();
+        serviceCollection.AddSingleton<IEventConsumer<MediaBrowser.Controller.Events.Session.SessionEndedEventArgs>>(sp => sp.GetRequiredService<SessionEndedNotifier>());
+
         serviceCollection.AddHostedService<LibraryChangeNotifier>();
+        serviceCollection.AddHostedService<PlaybackSessionListener>();
     }
 }
